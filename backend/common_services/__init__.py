@@ -14,9 +14,11 @@ NEVER constructing logic dynamically during conversation.
 from .logic_tree_framework import LogicTreeFramework
 from .matching_engine import UniversalMatchingEngine
 from .module_registry import ModuleRegistry
+from .analysis_engine import AnalysisEngine
 
 __all__ = [
     "LogicTreeFramework",
     "UniversalMatchingEngine",
     "ModuleRegistry",
+    "AnalysisEngine",
 ]
