@@ -148,7 +148,14 @@ class Settings:
     @property
     def debug_enabled(self) -> bool:
         """Check if any debug flag is enabled"""
-        return self.DEBUG_MODE
+        return (
+            self.DEBUG_MODE and (
+                self.DEBUG_SHOW_SQL or
+                self.DEBUG_SHOW_TREE_MATCHING or
+                self.DEBUG_SHOW_AI_PROMPTS or
+                self.DEBUG_SHOW_VALIDATION
+            )
+        )
     
     def enable_debug(self, *flags: str):
         """Enable specific debug flags"""
