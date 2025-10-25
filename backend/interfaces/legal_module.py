@@ -140,15 +140,21 @@ class ILegalModule(ABC):
         pass
 
     @abstractmethod
-    def check_completeness(self, filled_fields: Dict[str, Any]) -> float:
+    def check_completeness(self, filled_fields: Dict[str, Any]) -> Tuple[float, List[str]]:
         """
-        Calculate information completeness (0.0 to 1.0).
+        Calculate information completeness and identify missing fields.
 
         Args:
             filled_fields: Currently filled fields
 
         Returns:
-            Float between 0.0 (no info) and 1.0 (complete)
+            Tuple of (completeness_score, missing_fields)
+            - completeness_score: Float between 0.0 (no info) and 1.0 (complete)
+            - missing_fields: List of field names that are missing or incomplete
+
+        Example:
+            >>> score, missing = module.check_completeness({"court": "High Court"})
+            >>> # (0.3, ["party_type", "case_type", "amount"])
         """
         pass
 
@@ -157,43 +163,70 @@ class ILegalModule(ABC):
     # ============================================
 
     @abstractmethod
-    async def calculate(
-        self, matched_nodes: List[MatchResult], filled_fields: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def calculate(self, filled_fields: Dict[str, Any]) -> Dict[str, Any]:
         """
         Perform module-specific specialized calculation.
 
         THIS IS WHERE 100% ACCURACY HAPPENS.
 
+        Note: This is a synchronous method. The calculation logic is deterministic
+        and does not require async operations.
+
         Args:
-            matched_nodes: Nodes matched by matching engine
-            filled_fields: All information gathered
+            filled_fields: All information gathered from user
 
         Returns:
             Dictionary containing calculation results
+
+        Example:
+            >>> result = module.calculate({
+            ...     "court_level": "High Court",
+            ...     "case_type": "default_judgment",
+            ...     "amount": 10000
+            ... })
+            >>> # {"total_costs": 1500, "breakdown": {...}}
         """
         pass
 
     @abstractmethod
-    async def get_arguments(
+    def get_arguments(
         self, calculation_result: Dict[str, Any], filled_fields: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Generate legal arguments based on calculation.
 
+        Note: This is a synchronous method. Arguments are generated from
+        pre-built templates and calculation results.
+
+        Args:
+            calculation_result: Results from calculate()
+            filled_fields: Original user information
+
         Returns:
             Dictionary with arguments and supporting citations
+
+        Example:
+            >>> args = module.get_arguments(calc_result, filled_fields)
+            >>> # {"main_argument": "...", "supporting_citations": [...]}
         """
         pass
 
     @abstractmethod
-    async def get_recommendations(
-        self, calculation_result: Dict[str, Any], filled_fields: Dict[str, Any]
-    ) -> List[str]:
+    def get_recommendations(self, calculation_result: Dict[str, Any]) -> List[str]:
         """
-        Generate strategic recommendations.
+        Generate strategic recommendations based on calculation.
+
+        Note: This is a synchronous method. Recommendations are generated from
+        pre-built rules and calculation results.
+
+        Args:
+            calculation_result: Results from calculate()
 
         Returns:
             List of recommendation strings
+
+        Example:
+            >>> recs = module.get_recommendations(calc_result)
+            >>> # ["File within 14 days", "Include all supporting documents"]
         """
         pass

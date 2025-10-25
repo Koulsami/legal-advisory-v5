@@ -76,22 +76,19 @@ class MockLegalModule(ILegalModule):
             errors.append("test_field is required")
         return len(errors) == 0, errors
 
-    def check_completeness(self, filled_fields: Dict[str, Any]) -> float:
+    def check_completeness(self, filled_fields: Dict[str, Any]) -> Tuple[float, List[str]]:
         required = ["test_field"]
         filled = sum(1 for f in required if f in filled_fields)
-        return filled / len(required)
+        missing = [f for f in required if f not in filled_fields]
+        return filled / len(required), missing
 
-    async def calculate(
-        self, matched_nodes: List[MatchResult], filled_fields: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def calculate(self, filled_fields: Dict[str, Any]) -> Dict[str, Any]:
         return {"result": "mock_calculation", "value": 100.0}
 
-    async def get_arguments(
+    def get_arguments(
         self, calculation_result: Dict[str, Any], filled_fields: Dict[str, Any]
     ) -> Dict[str, Any]:
         return {"arguments": ["Mock argument 1", "Mock argument 2"]}
 
-    async def get_recommendations(
-        self, calculation_result: Dict[str, Any], filled_fields: Dict[str, Any]
-    ) -> List[str]:
+    def get_recommendations(self, calculation_result: Dict[str, Any]) -> List[str]:
         return ["Mock recommendation 1", "Mock recommendation 2"]
