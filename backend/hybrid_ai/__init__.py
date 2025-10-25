@@ -27,6 +27,10 @@ from backend.hybrid_ai.validation_guard import (
     ValidationReport,
     ValidationIssue
 )
+from backend.hybrid_ai.hybrid_orchestrator import (
+    HybridAIOrchestrator,
+    HybridResult
+)
 
 __all__ = [
     "ClaudeAIService",
@@ -38,4 +42,6 @@ __all__ = [
     "ValidationGuardError",
     "ValidationReport",
     "ValidationIssue",
+    "HybridAIOrchestrator",
+    "HybridResult",
 ]
