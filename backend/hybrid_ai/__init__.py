@@ -21,6 +21,12 @@ from backend.hybrid_ai.response_enhancer import (
     ResponseEnhancerError,
     EnhancementResult
 )
+from backend.hybrid_ai.validation_guard import (
+    ValidationGuard,
+    ValidationGuardError,
+    ValidationReport,
+    ValidationIssue
+)
 
 __all__ = [
     "ClaudeAIService",
@@ -28,4 +34,8 @@ __all__ = [
     "ResponseEnhancer",
     "ResponseEnhancerError",
     "EnhancementResult",
+    "ValidationGuard",
+    "ValidationGuardError",
+    "ValidationReport",
+    "ValidationIssue",
 ]
