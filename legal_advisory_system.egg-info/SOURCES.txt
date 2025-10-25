@@ -1,0 +1,5 @@
+setup.py
+legal_advisory_system.egg-info/PKG-INFO
+legal_advisory_system.egg-info/SOURCES.txt
+legal_advisory_system.egg-info/dependency_links.txt
+legal_advisory_system.egg-info/top_level.txt
