@@ -4,16 +4,17 @@ __pycache__/
 *$py.class
 *.so
 .Python
+
+# Virtual Environment (CRITICAL - don't commit venv!)
 venv/
 env/
-.env
-.venv
+ENV/
+.venv/
 
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
+# Package metadata (auto-generated)
+*.egg-info/
+dist/
+build/
 
 # Testing
 .pytest_cache/
@@ -21,17 +22,29 @@ env/
 htmlcov/
 .tox/
 
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Environment
+.env
+.env.local
+.env.testing
+.env.production
+
 # Database
 *.db
 *.sqlite
-*.sqlite3
-
-# Logs
-*.log
 
 # OS
 .DS_Store
 Thumbs.db
 
 # Project specific
-legal_advisory.db
+tests/_archived/
