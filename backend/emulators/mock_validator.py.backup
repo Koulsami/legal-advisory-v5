@@ -72,7 +72,9 @@ class MockValidator(IValidator):
                 if original_value != enhanced_value:
                     errors.append(
                         ValidationError(field_name=field,
+                            error_type="protected_field_modified",
                             message=f"Protected field '{field}' was modified",
+                            error_type="critical",
                             current_value=str(enhanced_value),
                         )
                     )
@@ -95,7 +97,9 @@ class MockValidator(IValidator):
             if isinstance(citation, str) and "hallucinated" in citation.lower():
                 errors.append(
                     ValidationError(field_name="citations",
+                        error_type="hallucinated_citation",
                         message=f"Suspicious citation detected: {citation}",
+                        error_type="high",
                         current_value=citation,
                     )
                 )
@@ -124,7 +128,9 @@ class MockValidator(IValidator):
             if wrong in content.lower():
                 errors.append(
                     ValidationError(field_name="content",
+                        error_type="terminology_error",
                         message=f"Incorrect spelling: '{wrong}' should be '{correct}'",
+                        error_type="medium",
                         current_value=correct,
                     )
                 )

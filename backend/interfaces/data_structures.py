@@ -6,17 +6,18 @@ These are used across all interfaces and modules.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
 from datetime import datetime
 from enum import Enum
-
+from typing import Any, Dict, List, Optional
 
 # ============================================
 # ENUMS
 # ============================================
 
+
 class ModuleStatus(Enum):
     """Module lifecycle status"""
+
     REGISTERED = "registered"
     ACTIVE = "active"
     DISABLED = "disabled"
@@ -25,6 +26,7 @@ class ModuleStatus(Enum):
 
 class AIProvider(Enum):
     """AI service providers"""
+
     ANTHROPIC_CLAUDE = "anthropic_claude"
     OPENAI_GPT = "openai_gpt"
     EMULATOR = "emulator"
@@ -32,6 +34,7 @@ class AIProvider(Enum):
 
 class AIServiceType(Enum):
     """Types of AI services"""
+
     CONVERSATION = "conversation"
     ANALYSIS = "analysis"
     ENHANCEMENT = "enhancement"
@@ -41,11 +44,12 @@ class AIServiceType(Enum):
 # CORE DATA STRUCTURES
 # ============================================
 
+
 @dataclass
 class LogicTreeNode:
     """
     Universal tree node structure.
-    
+
     Six logical dimensions based on legal reasoning:
     - WHAT: Definitions and concepts
     - WHICH: Categorizations and types
@@ -54,11 +58,12 @@ class LogicTreeNode:
     - GIVEN: Contextual conditions
     - WHY: Rationale and purpose
     """
+
     # Identity
     node_id: str
     citation: str
     module_id: str
-    
+
     # Six logical dimensions
     what: List[Dict[str, Any]] = field(default_factory=list)
     which: List[Dict[str, Any]] = field(default_factory=list)
@@ -66,17 +71,17 @@ class LogicTreeNode:
     modality: List[Dict[str, Any]] = field(default_factory=list)
     given: List[Dict[str, Any]] = field(default_factory=list)
     why: List[Dict[str, Any]] = field(default_factory=list)
-    
+
     # Metadata
     confidence: float = 1.0
     source_type: str = "rule"
     effective_date: Optional[str] = None
-    
+
     # Relationships
     parent_nodes: List[str] = field(default_factory=list)
     child_nodes: List[str] = field(default_factory=list)
     related_nodes: List[str] = field(default_factory=list)
-    
+
     def __post_init__(self):
         """Validate node after creation"""
         if not self.node_id:
@@ -90,6 +95,7 @@ class LogicTreeNode:
 @dataclass
 class MatchResult:
     """Result of matching user input to tree nodes"""
+
     node_id: str
     node: LogicTreeNode
     match_score: float
@@ -97,7 +103,7 @@ class MatchResult:
     missing_fields: List[str]
     confidence: float
     reasoning: str
-    
+
     def __post_init__(self):
         """Validate match result"""
         if not (0.0 <= self.match_score <= 1.0):
@@ -109,6 +115,7 @@ class MatchResult:
 @dataclass
 class ValidationError:
     """Validation error details"""
+
     field_name: str
     error_type: str
     message: str
@@ -120,6 +127,7 @@ class ValidationError:
 @dataclass
 class ConversationSession:
     """Conversation session state"""
+
     session_id: str
     user_id: str
     module_id: Optional[str]
@@ -128,7 +136,7 @@ class ConversationSession:
     created_at: datetime
     updated_at: datetime
     status: str  # "active", "analyzing", "complete"
-    
+
     def __post_init__(self):
         """Validate session"""
         valid_statuses = ["active", "analyzing", "complete", "error"]
@@ -139,6 +147,7 @@ class ConversationSession:
 @dataclass
 class ModuleMetadata:
     """Metadata for a legal module"""
+
     module_id: str
     module_name: str
     version: str
@@ -154,6 +163,7 @@ class ModuleMetadata:
 @dataclass
 class FieldRequirement:
     """Specification for a required field"""
+
     field_name: str
     field_type: str
     description: str
@@ -166,6 +176,7 @@ class FieldRequirement:
 @dataclass
 class QuestionTemplate:
     """Template for information gathering questions"""
+
     field_name: str
     template: str
     priority: int
@@ -176,6 +187,7 @@ class QuestionTemplate:
 @dataclass
 class AIRequest:
     """Request to AI service"""
+
     service_type: AIServiceType
     prompt: str
     context: Dict[str, Any] = field(default_factory=dict)
@@ -187,6 +199,7 @@ class AIRequest:
 @dataclass
 class AIResponse:
     """Response from AI service"""
+
     content: str
     service_type: AIServiceType
     tokens_used: int

@@ -5,51 +5,52 @@ Legal Advisory System v5.0
 All interface definitions (Abstract Base Classes)
 """
 
+from .ai_service import IAIService
+from .analysis import IAnalysisEngine
+from .calculator import ICalculator
+
 # Data Structures
 from .data_structures import (
-    LogicTreeNode,
-    MatchResult,
-    ValidationError,
-    ConversationSession,
-    ModuleMetadata,
-    FieldRequirement,
-    QuestionTemplate,
+    AIProvider,
     AIRequest,
     AIResponse,
-    ModuleStatus,
-    AIProvider,
     AIServiceType,
+    ConversationSession,
+    FieldRequirement,
+    LogicTreeNode,
+    MatchResult,
+    ModuleMetadata,
+    ModuleStatus,
+    QuestionTemplate,
+    ValidationError,
 )
 
 # Interfaces
 from .legal_module import ILegalModule
-from .ai_service import IAIService
 from .matching import IMatchingEngine
-from .validation import IValidator
 from .tree import ITreeFramework
-from .analysis import IAnalysisEngine
-from .calculator import ICalculator
+from .validation import IValidator
 
 __all__ = [
     # Data Structures
-    'LogicTreeNode',
-    'MatchResult',
-    'ValidationError',
-    'ConversationSession',
-    'ModuleMetadata',
-    'FieldRequirement',
-    'QuestionTemplate',
-    'AIRequest',
-    'AIResponse',
-    'ModuleStatus',
-    'AIProvider',
-    'AIServiceType',
+    "LogicTreeNode",
+    "MatchResult",
+    "ValidationError",
+    "ConversationSession",
+    "ModuleMetadata",
+    "FieldRequirement",
+    "QuestionTemplate",
+    "AIRequest",
+    "AIResponse",
+    "ModuleStatus",
+    "AIProvider",
+    "AIServiceType",
     # Interfaces
-    'ILegalModule',
-    'IAIService',
-    'IMatchingEngine',
-    'IValidator',
-    'ITreeFramework',
-    'IAnalysisEngine',
-    'ICalculator',
+    "ILegalModule",
+    "IAIService",
+    "IMatchingEngine",
+    "IValidator",
+    "ITreeFramework",
+    "IAnalysisEngine",
+    "ICalculator",
 ]

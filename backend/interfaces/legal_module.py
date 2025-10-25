@@ -6,37 +6,38 @@ All legal modules (Order 21, Order 5, etc.) must implement this interface.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Tuple
+from typing import Any, Dict, List, Tuple
+
 from .data_structures import (
-    ModuleMetadata,
     FieldRequirement,
-    QuestionTemplate,
     LogicTreeNode,
-    MatchResult
+    MatchResult,
+    ModuleMetadata,
+    QuestionTemplate,
 )
 
 
 class ILegalModule(ABC):
     """
     Abstract base class that ALL legal modules must implement.
-    
+
     This is the core contract for pluggable legal modules.
     Each module (Order 21, Order 5, Order 19, etc.) implements this interface.
     """
-    
+
     # ============================================
     # METADATA
     # ============================================
-    
+
     @property
     @abstractmethod
     def metadata(self) -> ModuleMetadata:
         """
         Return module metadata.
-        
+
         Returns:
             ModuleMetadata with module info
-            
+
         Example:
             ModuleMetadata(
                 module_id="ORDER_21",
@@ -52,51 +53,51 @@ class ILegalModule(ABC):
             )
         """
         pass
-    
+
     # ============================================
     # TREE MANAGEMENT
     # ============================================
-    
+
     @abstractmethod
     def get_tree_nodes(self) -> List[LogicTreeNode]:
         """
         Return PRE-BUILT logic tree nodes for this module.
-        
+
         CRITICAL: Tree must be PRE-BUILT during module initialization.
         Trees are NEVER constructed dynamically during conversation.
-        
+
         Returns:
             List of LogicTreeNode objects
-            
+
         Example for Order 21:
             - 29 rules from Order 21
             - 9 scenarios from Appendix 1
             - Total: 38 pre-built nodes
         """
         pass
-    
+
     @abstractmethod
     def get_tree_version(self) -> str:
         """
         Return version of the logic tree.
-        
+
         Returns:
             Semantic version string (e.g., "1.2.0")
         """
         pass
-    
+
     # ============================================
     # FIELD REQUIREMENTS
     # ============================================
-    
+
     @abstractmethod
     def get_field_requirements(self) -> List[FieldRequirement]:
         """
         Return list of all fields required by this module.
-        
+
         Returns:
             List of FieldRequirement objects
-            
+
         Example:
             [
                 FieldRequirement(
@@ -110,100 +111,88 @@ class ILegalModule(ABC):
             ]
         """
         pass
-    
+
     @abstractmethod
     def get_question_templates(self) -> List[QuestionTemplate]:
         """
         Return template questions for information gathering.
-        
+
         Returns:
             List of QuestionTemplate objects
         """
         pass
-    
+
     # ============================================
     # VALIDATION
     # ============================================
-    
+
     @abstractmethod
-    def validate_fields(
-        self,
-        filled_fields: Dict[str, Any]
-    ) -> Tuple[bool, List[str]]:
+    def validate_fields(self, filled_fields: Dict[str, Any]) -> Tuple[bool, List[str]]:
         """
         Validate filled fields meet module requirements.
-        
+
         Args:
             filled_fields: Dictionary of field_name -> value
-            
+
         Returns:
             Tuple of (is_valid: bool, errors: List[str])
         """
         pass
-    
+
     @abstractmethod
-    def check_completeness(
-        self,
-        filled_fields: Dict[str, Any]
-    ) -> float:
+    def check_completeness(self, filled_fields: Dict[str, Any]) -> float:
         """
         Calculate information completeness (0.0 to 1.0).
-        
+
         Args:
             filled_fields: Currently filled fields
-            
+
         Returns:
             Float between 0.0 (no info) and 1.0 (complete)
         """
         pass
-    
+
     # ============================================
     # SPECIALIZED LOGIC (100% Accurate)
     # ============================================
-    
+
     @abstractmethod
     async def calculate(
-        self,
-        matched_nodes: List[MatchResult],
-        filled_fields: Dict[str, Any]
+        self, matched_nodes: List[MatchResult], filled_fields: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Perform module-specific specialized calculation.
-        
+
         THIS IS WHERE 100% ACCURACY HAPPENS.
-        
+
         Args:
             matched_nodes: Nodes matched by matching engine
             filled_fields: All information gathered
-            
+
         Returns:
             Dictionary containing calculation results
         """
         pass
-    
+
     @abstractmethod
     async def get_arguments(
-        self,
-        calculation_result: Dict[str, Any],
-        filled_fields: Dict[str, Any]
+        self, calculation_result: Dict[str, Any], filled_fields: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Generate legal arguments based on calculation.
-        
+
         Returns:
             Dictionary with arguments and supporting citations
         """
         pass
-    
+
     @abstractmethod
     async def get_recommendations(
-        self,
-        calculation_result: Dict[str, Any],
-        filled_fields: Dict[str, Any]
+        self, calculation_result: Dict[str, Any], filled_fields: Dict[str, Any]
     ) -> List[str]:
         """
         Generate strategic recommendations.
-        
+
         Returns:
             List of recommendation strings
         """

@@ -1,20 +1,3 @@
-Metadata-Version: 2.4
-Name: legal-advisory-system
-Version: 5.0.0a0
-Summary: Singapore Legal Advisory System v5.0 - Hybrid AI for Order 21 Costs
-Author-email: Sameer Koulsami <koulsami@example.com>
-Requires-Python: >=3.10
-Description-Content-Type: text/markdown
-Requires-Dist: fastapi>=0.104.0
-Requires-Dist: uvicorn[standard]>=0.24.0
-Requires-Dist: pydantic>=2.0.0
-Requires-Dist: python-dotenv>=1.0.0
-Provides-Extra: dev
-Requires-Dist: pytest>=7.4.0; extra == "dev"
-Requires-Dist: pytest-asyncio>=0.21.0; extra == "dev"
-Requires-Dist: pytest-cov>=4.1.0; extra == "dev"
-Requires-Dist: pytest-mock>=3.12.0; extra == "dev"
-
 # Legal Advisory System v5.0
 ## Singapore Rules of Court - Hybrid AI Legal Advisory Platform
 
