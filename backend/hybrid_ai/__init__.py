@@ -7,7 +7,7 @@ while maintaining 100% calculation accuracy.
 
 Components:
 - ClaudeAIService: Production Claude AI integration
-- Response Enhancer: Enhances calculation results with AI explanations
+- ResponseEnhancer: Enhances calculation results with AI explanations
 - Validation Layer: Ensures AI responses don't contradict calculations
 - Hybrid Orchestrator: Coordinates hybrid AI workflow
 
@@ -16,8 +16,16 @@ specialized calculations.
 """
 
 from backend.hybrid_ai.claude_ai_service import ClaudeAIService, ClaudeAIServiceError
+from backend.hybrid_ai.response_enhancer import (
+    ResponseEnhancer,
+    ResponseEnhancerError,
+    EnhancementResult
+)
 
 __all__ = [
     "ClaudeAIService",
     "ClaudeAIServiceError",
+    "ResponseEnhancer",
+    "ResponseEnhancerError",
+    "EnhancementResult",
 ]
