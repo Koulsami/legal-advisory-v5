@@ -205,3 +205,111 @@ class AIResponse:
     tokens_used: int
     finish_reason: str
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+# ============================================
+# CONVERSATION DATA STRUCTURES
+# ============================================
+
+
+class ConversationStatus(Enum):
+    """Conversation session status"""
+
+    ACTIVE = "active"
+    INFORMATION_GATHERING = "information_gathering"
+    ANALYZING = "analyzing"
+    COMPLETE = "complete"
+    ERROR = "error"
+
+
+class MessageRole(Enum):
+    """Message role in conversation"""
+
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
+
+
+@dataclass
+class ConversationMessage:
+    """Single message in conversation"""
+
+    role: MessageRole
+    content: str
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ConversationSession:
+    """
+    Session state for ongoing conversation.
+
+    Tracks all information gathered during conversation,
+    including filled fields, conversation history, and analysis results.
+    """
+
+    session_id: str
+    user_id: str
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+    status: ConversationStatus = ConversationStatus.ACTIVE
+
+    # Module selection
+    module_id: Optional[str] = None
+    module_confidence: float = 0.0
+
+    # Information gathering
+    filled_fields: Dict[str, Any] = field(default_factory=dict)
+    completeness_score: float = 0.0
+    missing_fields: List[str] = field(default_factory=list)
+
+    # Conversation history
+    messages: List[ConversationMessage] = field(default_factory=list)
+
+    # Analysis results (when complete)
+    analysis_result: Optional[Dict[str, Any]] = None
+    calculation_result: Optional[Dict[str, Any]] = None
+
+    # Metadata
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ConversationResponse:
+    """
+    Response to user message in conversation.
+
+    Contains the assistant's message, current session state,
+    and any actions to take.
+    """
+
+    message: str
+    session_id: str
+    status: ConversationStatus
+
+    # Progress indicators
+    completeness_score: float = 0.0
+    next_action: Optional[str] = None  # "ask_question", "analyze", "complete"
+
+    # Questions (if asking for more information)
+    questions: List[str] = field(default_factory=list)
+
+    # Results (if analysis complete)
+    result: Optional[Dict[str, Any]] = None
+
+    # Metadata
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class InfoGap:
+    """Information gap that needs to be filled"""
+
+    field_name: str
+    field_type: str
+    description: str
+    priority: int
+    required: bool
+    current_value: Optional[Any] = None
+    validation_rules: Dict[str, Any] = field(default_factory=dict)
