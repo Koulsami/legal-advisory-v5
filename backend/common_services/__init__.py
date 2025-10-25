@@ -12,7 +12,9 @@ NEVER constructing logic dynamically during conversation.
 """
 
 from .logic_tree_framework import LogicTreeFramework
+from .matching_engine import UniversalMatchingEngine
 
 __all__ = [
     "LogicTreeFramework",
+    "UniversalMatchingEngine",
 ]
