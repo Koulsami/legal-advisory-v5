@@ -1,246 +1,225 @@
-# CLAUDE.md
+# Legal Advisory System v5.0 - Claude Code Context
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 🎯 Project Overview
 
-## Project Overview
+This is a **Legal Advisory System v5.0** for Singapore's Rules of Court Order 21 (legal costs). It's a hybrid AI system combining specialized legal calculations with AI enhancement.
 
-Legal Advisory System v5.0 - A hybrid AI legal advisory system for Singapore's Rules of Court. The system demonstrates measurable superiority over generic AI systems (100% calculation accuracy vs ~60%) through specialized legal calculations combined with AI enhancement.
+**Architecture:** Modular plugin system with 5 layers
+- User Interface (React)
+- Conversation Orchestration
+- Hybrid AI Orchestration  
+- Common Services (Logic Tree Framework, Matching Engine, etc.)
+- Legal Modules (Order 21, Order 5, etc.)
 
-**Current Status:** Phase 1 Complete (Interfaces & Configuration), Phase 2 In Progress (Debugging & Emulators)
+## 📍 Current Status
 
-## Architecture
+### ✅ Completed
+- **Days 1-8:** Foundation complete
+  - All 8 core interfaces (ABCs) defined
+  - Debug framework implemented
+  - All 4 emulators working (24/24 tests passing)
+  - Configuration system complete
 
-Five-layer modular design implementing a plugin-based microkernel architecture:
+- **Day 9:** Logic Tree Framework ✅
+  - LogicTreeFramework class (537 lines)
+  - Data structures (LogicTreeNode, MatchResult, etc.)
+  - 40 comprehensive tests (100% passing, 91% coverage)
 
-1. **User Interface Layer** - React frontend (Netlify)
-2. **Conversation Orchestration Layer** - Natural language → Structured data
-3. **Hybrid AI Orchestration Layer** - AI Enhancement + Validation
-4. **Common Services Layer** - Matching Engine, Analysis, Registry
-5. **Legal Modules Layer** - Pluggable modules (Order 21, Order 5, Order 19...)
+### 🎯 Current Day
+**Update this as you progress:**
+- Day: [UPDATE ME]
+- Task: [UPDATE ME]
+- Status: [UPDATE ME]
 
-### Key Architectural Principles
+## 🏗️ Architecture Principles
 
-- **Interface-Based Design**: All components implement abstract base classes (ABCs) defined in `backend/interfaces/`
-- **Plugin Architecture**: Legal modules are pluggable via `ILegalModule` interface
-- **Separation of Concerns**: Clear boundaries between layers
-- **Emulator System**: Mock implementations for testing without external dependencies
-- **Zero-Overhead Debugging**: Debug framework with toggleable features (enabled in dev, disabled in prod)
+### Critical Principles
+1. **Pre-built Trees Only:** Logic trees are PRE-BUILT from legal rules during module initialization, NEVER constructed dynamically during conversation
+2. **Hybrid AI Approach:** Specialized logic handles calculations (100% accuracy), AI enhances explanations
+3. **Test-Driven Development:** 95%+ coverage required for all components
+4. **SOLID Principles:** Clean architecture, interface-based design
+5. **One Step at a Time:** Implement incrementally, test thoroughly
 
-## Development Commands
+### The Six Logical Dimensions
+Every LogicTreeNode has these universal dimensions:
+- **WHAT:** Facts, propositions, conclusions
+- **WHICH:** Scope, entities, classifications  
+- **IF-THEN:** Conditional logic, implications
+- **MODALITY:** Obligations (MUST, MAY, CAN, CANNOT)
+- **GIVEN:** Assumptions, premises, context
+- **WHY:** Reasoning, rationale, policy
 
-### Testing
+## 📂 Project Structure
+
+```
+legal-advisory-v5/
+├── backend/
+│   ├── interfaces/              # ABCs and data structures
+│   │   ├── data_structures.py   # LogicTreeNode, MatchResult, etc.
+│   │   ├── legal_module.py      # ILegalModule ABC
+│   │   ├── ai_service.py        # IAIService ABC
+│   │   ├── matching.py          # IMatchingEngine ABC
+│   │   ├── validation.py        # IValidator ABC
+│   │   ├── tree.py              # ITreeFramework ABC
+│   │   ├── analysis.py          # IAnalysisEngine ABC
+│   │   └── calculator.py        # ICalculator ABC
+│   ├── common_services/         # Shared services
+│   │   ├── logic_tree_framework.py  # ✅ Day 9
+│   │   ├── matching_engine.py       # Days 10-11
+│   │   ├── module_registry.py       # Day 12
+│   │   └── analysis_engine.py       # Day 13
+│   ├── emulators/               # Test emulators
+│   │   ├── ai_emulator.py
+│   │   ├── database_emulator.py
+│   │   ├── matching_emulator.py
+│   │   └── module_emulator.py
+│   ├── config/
+│   │   └── settings.py          # Configuration system
+│   └── utils/
+│       └── debug.py             # Debug framework
+├── tests/                       # All test files
+│   ├── interfaces/
+│   ├── common_services/
+│   └── emulators/
+└── docs/                        # Documentation
+    ├── PROJECT_IMPLEMENTATION_PLAN.md    # 40-day roadmap
+    ├── 02_High_Level_Design_v5_MODULAR.md
+    ├── INTERFACE_DEFINITIONS.md
+    └── legal-logic-tree-spec__1_.md
+```
+
+## 🛠️ Development Workflow
+
+### Starting a New Day
+
+1. Read the plan: Check `PROJECT_IMPLEMENTATION_PLAN.md` for today's tasks
+2. Review interfaces: Understand which ABCs you'll implement
+3. Create implementation: Follow the spec exactly
+4. Write tests: 95%+ coverage required
+5. Run tests: `pytest tests/ -v --cov`
+6. Commit: Use format "Day [N]: [Feature] complete"
+
+### Testing Commands
 
 ```bash
-# Run all integration tests
-pytest tests/integration/ -v
-
-# Run all tests (integration + unit + emulators)
+# Run all tests
 pytest tests/ -v
 
-# Run with coverage report
-pytest tests/integration/ -v --cov=backend --cov-report=html
+# Run with coverage
+pytest tests/ --cov=backend --cov-report=term-missing
 
 # Run specific test file
-pytest tests/integration/test_interface_compliance.py -v
+pytest tests/common_services/test_logic_tree_framework.py -v
 
-# Run specific test
-pytest tests/integration/test_interface_compliance.py::test_mock_legal_module_implements_interface -v
+# Run tests for specific module
+pytest tests/common_services/ -v
 ```
 
-### Package Installation
+### Common Tasks
 
 ```bash
-# Install in editable mode with dev dependencies
-pip install -e .
-
-# Install with dev dependencies from pyproject.toml
-pip install -e ".[dev]"
-
-# Reinstall after changes to setup.py or pyproject.toml
-pip install -e . --force-reinstall
-```
-
-### Environment Setup
-
-```bash
-# Create virtual environment
-python -m venv venv
-
-# Activate (Linux/Mac)
-source venv/bin/activate
-
-# Activate (Windows)
-venv\Scripts\activate
-
 # Install dependencies
-pip install -e .
+pip install pytest pytest-cov --break-system-packages
+
+# Run quick verification
+python3 -c "from backend.common_services.logic_tree_framework import LogicTreeFramework; print('✓ Imports work')"
+
+# Check test coverage
+coverage report --include="*/logic_tree_framework.py"
 ```
 
-## Code Structure
+## 📋 Key Files to Reference
 
-### Core Interfaces (`backend/interfaces/`)
+- **Implementation Plan:** `PROJECT_IMPLEMENTATION_PLAN.md` - 40-day detailed plan
+- **Architecture:** `02_High_Level_Design_v5_MODULAR.md` - System architecture
+- **Interfaces:** `INTERFACE_DEFINITIONS.md` - All ABC specifications
+- **Logic Tree Spec:** `legal-logic-tree-spec__1_.md` - Tree structure details
 
-All interfaces are abstract base classes that define contracts:
+## 🎨 Code Style Guidelines
 
-- `legal_module.py` - `ILegalModule` - Legal module plugin interface
-- `ai_service.py` - `IAIService` - AI service provider interface
-- `matching.py` - `IMatchingEngine` - Matching strategy interface
-- `validation.py` - `IValidator` - Validation service interface
-- `tree.py` - `ITreeFramework` - Logic tree management interface
-- `analysis.py` - `IAnalysisEngine` - Analysis orchestration interface
-- `calculator.py` - `ICalculator` - Cost calculation interface
-- `data_structures.py` - Shared data structures (LogicTreeNode, MatchResult, etc.)
+### Python Style
+- Use type hints for all functions
+- Comprehensive docstrings with examples
+- Follow PEP 8
+- Maximum line length: 88 characters (Black default)
+- Use dataclasses for data structures
 
-### Emulator/Mock System (`backend/emulators/`)
+### Testing Style
+- Test file: `test_[module_name].py`
+- Test function: `test_[feature]_[scenario]()`
+- Use fixtures for common setup
+- Clear test names describing what's being tested
 
-Two types of testing implementations:
+### Commit Messages
+- Format: "Day [N]: [Feature] complete"
+- Examples:
+  - "Day 9: Logic Tree Framework complete"
+  - "Day 10: Universal Matching Engine complete"
+  - "Day 18: Order 21 Module implementation started"
 
-1. **Mock Implementations** - Basic implementations for interface compliance testing:
-   - `mock_legal_module.py`, `mock_ai_service.py`, etc.
-   - Used in `tests/integration/test_interface_compliance.py`
+## 🚫 What NOT to Do
 
-2. **Emulator Implementations** - Advanced implementations with realistic behavior:
-   - `ai_emulator.py` - Simulates AI responses with deterministic logic
-   - `database_emulator.py` - In-memory database simulation
-   - `matching_emulator.py` - Predictable matching results
-   - `module_emulator.py` - Minimal legal module tree
-   - Used for end-to-end testing without external dependencies
+1. **Never** construct logic trees dynamically during conversation
+2. **Never** skip tests or accept <95% coverage
+3. **Never** modify interface definitions without updating all implementations
+4. **Never** mix AI enhancement with specialized calculations
+5. **Never** commit without running tests
 
-### Configuration System (`backend/config/settings.py`)
+## ✅ What TO Do
 
-Environment-based configuration using Pydantic:
+1. **Always** read the plan for the current day
+2. **Always** implement interfaces before concrete classes
+3. **Always** write tests alongside implementation
+4. **Always** validate tree structures before registration
+5. **Always** document with examples in docstrings
 
-- **Environment Types**: Development, Testing, Staging, Production
-- **Debug Levels**: None, Error, Warning, Info, Debug, Trace
-- **Feature Toggles**: Emulators, debug tracing, metrics, etc.
-- **Global Settings**: Access via `get_settings()` singleton
+## 🔧 Debugging
 
-Example:
+### Debug Framework Available
 ```python
-from backend.config.settings import get_settings, is_debug_enabled
+from backend.utils.debug import debug_log, DebugContext
 
-settings = get_settings()
-if is_debug_enabled():
-    # Debug code only runs when enabled
+# Enable debugging in config/settings.py
+DEBUG_ENABLED = True
+
+# Use debug logging
+debug_log("message", level="INFO", category="MATCHING")
+
+# Use debug context
+with DebugContext("tree_validation"):
+    # Your code here
     pass
 ```
 
-### Debugging Framework (`backend/utils/debug.py`)
+### Common Issues
 
-Zero-overhead debugging system:
-
-- `@trace_function()` - Decorator to log function entry/exit with parameters
-- `debug_log()` - Conditional logging based on debug level
-- `DebugContext` - Context manager for grouped debug output
-- **Critical**: All debug checks verify `settings.debug_enabled` first for zero overhead in production
-
-### Common Services (`backend/common_services/`)
-
-Shared services used across all legal modules:
-
-- `logic_tree_framework.py` - Tree navigation and evaluation (currently implemented)
-- Additional services planned: matching engine, analysis engine, etc.
-
-## Development Patterns
-
-### Creating a New Legal Module
-
-1. Implement `ILegalModule` interface from `backend/interfaces/legal_module.py`
-2. Define your logic tree structure using `LogicTreeNode`
-3. Implement all required methods: `get_tree_nodes()`, `calculate()`, `validate_fields()`, etc.
-4. Add module metadata with unique `module_id`
-5. Register module with the system (registration system TBD in Phase 3)
-
-### Adding a New Interface
-
-1. Create interface file in `backend/interfaces/`
-2. Define abstract base class inheriting from `ABC`
-3. Use `@abstractmethod` decorator for required methods
-4. Create corresponding mock in `backend/emulators/` for testing
-5. Add integration test in `tests/integration/test_interface_compliance.py`
-
-### Writing Tests
-
-- **Integration Tests** (`tests/integration/`): Test interface compliance and component integration
-- **Unit Tests** (`tests/unit/`): Test individual components in isolation
-- **Emulator Tests** (`tests/emulators/`): Test emulator implementations
-- All tests must pass before committing (10/10 currently passing)
-- Maintain 96%+ code coverage
-
-### Using Emulators
-
-Toggle emulators in configuration:
-```python
-settings = get_settings()
-settings.use_ai_emulator = True  # Use AI emulator instead of real API
-settings.use_database_emulator = True  # Use in-memory database
-settings.use_matching_emulator = True  # Use predictable matching
+**Import Errors:**
+```bash
+# Fix: Add backend to Python path
+export PYTHONPATH="${PYTHONPATH}:/path/to/legal-advisory-v5"
 ```
 
-## Important Notes
+**Test Failures:**
+- Check fixtures are properly defined
+- Verify imports are correct
+- Ensure test data matches expected structure
 
-### Interface Compliance
+## 📊 Success Metrics
 
-- Every component MUST implement its interface fully
-- Use `isinstance(component, Interface)` to verify at runtime
-- Mock/emulator implementations must pass all interface compliance tests
+- **Test Coverage:** 95%+ required
+- **Test Pass Rate:** 100% required
+- **Code Quality:** All tests passing, no linting errors
+- **Documentation:** All functions have docstrings with examples
 
-### Debug System Usage
+## 🎯 Next Steps (Update Daily)
 
-- ALWAYS check `is_debug_enabled()` before expensive debug operations
-- Use appropriate debug levels: ERROR < WARNING < INFO < DEBUG < TRACE
-- Set `debug_enabled=False` in production for zero overhead
-- Trace toggles: `trace_function_calls`, `trace_ai_calls`, `trace_matching_engine`, etc.
+**Today's Goal:**
+[Update with current day's objective]
 
-### Data Structures
+**Tomorrow's Goal:**
+[Update with next day's objective]
 
-All shared data structures are defined in `backend/interfaces/data_structures.py`:
-- `LogicTreeNode` - Tree structure for legal logic
-- `MatchResult` - Result of matching operations
-- `FieldRequirement` - Field validation requirements
-- `QuestionTemplate` - Conversation question templates
-- `ModuleMetadata` - Module identification and versioning
-- And more...
+---
 
-### Git Workflow
-
-Recent commits show clear phase-based development:
-- Phase 1: Interfaces, Mocks, Configuration (Complete)
-- Phase 2: Debugging & Emulators (In Progress - Days 6-8)
-- Future: Common Services, Hybrid AI, Legal Modules, Frontend
-
-### Dependencies
-
-Core dependencies (from `pyproject.toml`):
-- Python 3.10+ (using 3.12 currently)
-- FastAPI - Web framework
-- Uvicorn - ASGI server
-- Pydantic - Data validation and settings
-
-Dev dependencies:
-- pytest - Testing framework
-- pytest-asyncio - Async test support
-- pytest-cov - Coverage reporting
-- pytest-mock - Mocking support
-
-## Phase Roadmap
-
-| Phase | Days | Status | Focus |
-|-------|------|--------|-------|
-| Phase 0 | 1-2 | ✅ Complete | Setup |
-| Phase 1 | 3-5 | ✅ Complete | Interfaces & Configuration |
-| Phase 2 | 6-8 | 🔄 Current | Debugging & Emulators |
-| Phase 3 | 9-13 | ⏳ Planned | Common Services |
-| Phase 4 | 14-17 | ⏳ Planned | Hybrid AI Layer |
-| Phase 5 | 18-23 | ⏳ Planned | Order 21 Module |
-| Phase 6 | 24-28 | ⏳ Planned | Conversation Layer |
-| Phase 7 | 29-33 | ⏳ Planned | Integration & Testing |
-| Phase 8 | 34-36 | ⏳ Planned | Demo & Documentation |
-| Phase 9 | 37-40 | ⏳ Planned | Deployment |
-
-## Documentation References
-
-- `README.md` - Project overview and quick start
-- `docs/phase1/PHASE1_COMPLETE.md` - Phase 1 completion report
-- `docs/phase1/INTERFACE_USAGE_EXAMPLES.md` - Interface usage examples
-- Project planning docs available in root directory
+*Last Updated: Day 9 - October 26, 2025*
+*Current Status: Logic Tree Framework complete, ready for Day 10*
