@@ -1,407 +1,451 @@
 """
-Configuration Settings
-Legal Advisory System v5.0
+System-wide configuration with toggle-able features.
+Environment-specific settings loaded from .env files.
 
-Enhanced with debugging capabilities and environment management.
+CRITICAL: Debug toggles provide ZERO overhead when disabled.
 """
 
-import os
+from pydantic_settings import BaseSettings
+from pydantic import Field
+from typing import Optional
 from enum import Enum
-from functools import lru_cache
-from typing import Any, Dict, Optional
+from pathlib import Path
 
 
 class Environment(str, Enum):
-    """Environment types"""
-
+    """Deployment environments"""
     DEVELOPMENT = "development"
     TESTING = "testing"
+    STAGING = "staging"
     PRODUCTION = "production"
 
 
-class Settings:
+class DebugLevel(str, Enum):
+    """Debug verbosity levels"""
+    NONE = "none"        # Production - no debug output
+    ERROR = "error"      # Log errors only
+    WARNING = "warning"  # Log warnings and errors
+    INFO = "info"        # Log info, warnings, errors
+    DEBUG = "debug"      # Log everything
+    TRACE = "trace"      # Log everything + method entry/exit
+
+
+class Settings(BaseSettings):
     """
-    Application Settings
-
-    Loads from environment variables with sensible defaults.
-    Supports different environments and debugging capabilities.
+    System-wide settings with environment overrides.
+    
+    Loads from environment variables and .env files.
+    Supports different configurations per environment.
     """
-
-    # ============================================
-    # INITIALIZATION
-    # ============================================
-
-    def __init__(self, **overrides):
-        """Initialize settings with optional overrides"""
-        # Type cast overrides
-        self._overrides = {}
-        for key, value in overrides.items():
-            if (
-                key.endswith("_PORT")
-                or key.endswith("_SIZE")
-                or key == "MAX_WORKERS"
-                or key == "API_WORKERS"
-            ):
-                self._overrides[key] = int(value) if not isinstance(value, int) else value
-            elif key.startswith("DEBUG_") or key in [
-                "AI_ENABLED",
-                "MODULE_AUTO_LOAD",
-                "CACHE_ENABLED",
-                "AI_FALLBACK_TO_EMULATOR",
-            ]:
-                if isinstance(value, bool):
-                    self._overrides[key] = value
-                else:
-                    self._overrides[key] = str(value).lower() in ("true", "1", "yes", "on")
-            elif key.endswith("_THRESHOLD") or key.endswith("_DELAY"):
-                self._overrides[key] = float(value) if not isinstance(value, float) else value
-            else:
-                self._overrides[key] = value
-
-    def _get(self, key: str, default: Any = None, type_cast=str) -> Any:
-        """Get setting with override support"""
-        if key in self._overrides:
-            return self._overrides[key]
-
-        value = os.getenv(key, default)
-
-        if value is None:
-            return None
-
-        if type_cast == bool:
-            return str(value).lower() in ("true", "1", "yes", "on")
-        elif type_cast == int:
-            return int(value)
-        elif type_cast == float:
-            return float(value)
-        else:
-            return value
-
+    
     # ============================================
     # ENVIRONMENT
     # ============================================
-
-    @property
-    def ENVIRONMENT(self) -> str:
-        return self._get("ENVIRONMENT", "development")
-
-    @property
-    def is_development(self) -> bool:
-        """Check if running in development"""
-        return self.ENVIRONMENT == Environment.DEVELOPMENT.value
-
-    @property
-    def is_testing(self) -> bool:
-        """Check if running in testing"""
-        return self.ENVIRONMENT == Environment.TESTING.value
-
-    @property
-    def is_production(self) -> bool:
-        """Check if running in production"""
-        return self.ENVIRONMENT == Environment.PRODUCTION.value
-
+    
+    environment: Environment = Field(
+        default=Environment.DEVELOPMENT,
+        description="Current deployment environment"
+    )
+    
+    project_root: Path = Field(
+        default_factory=lambda: Path(__file__).parent.parent,
+        description="Project root directory"
+    )
+    
     # ============================================
-    # DEBUG SETTINGS
+    # DEBUG & TRACING TOGGLES (CRITICAL)
     # ============================================
-
-    @property
-    def DEBUG_MODE(self) -> bool:
-        """Master debug switch - disables ALL debugging in production"""
-        if self.is_production:
-            return False
-        return self._get("DEBUG_MODE", True, bool)
-
-    @DEBUG_MODE.setter
-    def DEBUG_MODE(self, value: bool):
-        """Set debug mode"""
-        self._overrides["DEBUG_MODE"] = value
-
-    @property
-    def DEBUG_SHOW_SQL(self) -> bool:
-        """Show SQL queries"""
-        return self.DEBUG_MODE and self._get("DEBUG_SHOW_SQL", False, bool)
-
-    @DEBUG_SHOW_SQL.setter
-    def DEBUG_SHOW_SQL(self, value: bool):
-        """Set DEBUG_SHOW_SQL"""
-        self._overrides["DEBUG_SHOW_SQL"] = value
-
-    @property
-    def DEBUG_SHOW_TREE_MATCHING(self) -> bool:
-        """Show tree matching process"""
-        return self.DEBUG_MODE and self._get("DEBUG_SHOW_TREE_MATCHING", False, bool)
-
-    @DEBUG_SHOW_TREE_MATCHING.setter
-    def DEBUG_SHOW_TREE_MATCHING(self, value: bool):
-        """Set DEBUG_SHOW_TREE_MATCHING"""
-        self._overrides["DEBUG_SHOW_TREE_MATCHING"] = value
-
-    @property
-    def DEBUG_SHOW_AI_PROMPTS(self) -> bool:
-        """Show AI prompts and responses"""
-        return self.DEBUG_MODE and self._get("DEBUG_SHOW_AI_PROMPTS", False, bool)
-
-    @DEBUG_SHOW_AI_PROMPTS.setter
-    def DEBUG_SHOW_AI_PROMPTS(self, value: bool):
-        """Set DEBUG_SHOW_AI_PROMPTS"""
-        self._overrides["DEBUG_SHOW_AI_PROMPTS"] = value
-
-    @property
-    def DEBUG_SHOW_VALIDATION(self) -> bool:
-        """Show validation process"""
-        return self.DEBUG_MODE and self._get("DEBUG_SHOW_VALIDATION", False, bool)
-
-    @DEBUG_SHOW_VALIDATION.setter
-    def DEBUG_SHOW_VALIDATION(self, value: bool):
-        """Set DEBUG_SHOW_VALIDATION"""
-        self._overrides["DEBUG_SHOW_VALIDATION"] = value
-
-    @property
-    def debug_enabled(self) -> bool:
-        """Check if any debug flag is enabled"""
-        return self.DEBUG_MODE
-
-    def enable_debug(self, *flags: str):
-        """Enable specific debug flags"""
-        if not self.DEBUG_MODE:
-            return
-
-        for flag in flags:
-            env_var = f"DEBUG_SHOW_{flag.upper()}"
-            self._overrides[env_var] = True
-
-    def enable_all_debug(self):
-        """Enable all debug flags"""
-        self._overrides["DEBUG_MODE"] = True
-        self._overrides["DEBUG_SHOW_SQL"] = True
-        self._overrides["DEBUG_SHOW_TREE_MATCHING"] = True
-        self._overrides["DEBUG_SHOW_AI_PROMPTS"] = True
-        self._overrides["DEBUG_SHOW_VALIDATION"] = True
-
-    def disable_debug(self):
-        """Disable all debugging (legacy method)"""
-        self.disable_all_debug()
-
-    def disable_all_debug(self):
-        """Disable all debug flags"""
-        self._overrides["DEBUG_MODE"] = False
-        self._overrides["DEBUG_SHOW_SQL"] = False
-        self._overrides["DEBUG_SHOW_TREE_MATCHING"] = False
-        self._overrides["DEBUG_SHOW_AI_PROMPTS"] = False
-        self._overrides["DEBUG_SHOW_VALIDATION"] = False
-
-    def get_debug_summary(self) -> dict:
-        """Get summary of all debug settings"""
-        return {
-            "debug_mode": self.DEBUG_MODE,
-            "show_sql": self.DEBUG_SHOW_SQL,
-            "show_tree_matching": self.DEBUG_SHOW_TREE_MATCHING,
-            "show_ai_prompts": self.DEBUG_SHOW_AI_PROMPTS,
-            "show_validation": self.DEBUG_SHOW_VALIDATION,
-            "any_debug_enabled": self.debug_enabled,
-        }
-
+    
+    debug_enabled: bool = Field(
+        default=True,
+        description="Master debug toggle. False = ZERO debug overhead"
+    )
+    
+    debug_level: DebugLevel = Field(
+        default=DebugLevel.DEBUG,
+        description="Debug verbosity level"
+    )
+    
+    trace_function_calls: bool = Field(
+        default=True,
+        description="Log function entry/exit with parameters"
+    )
+    
+    trace_ai_calls: bool = Field(
+        default=True,
+        description="Log all AI service calls with prompts/responses"
+    )
+    
+    trace_database_queries: bool = Field(
+        default=False,
+        description="Log all database queries (verbose!)"
+    )
+    
+    trace_matching_engine: bool = Field(
+        default=True,
+        description="Log matching engine operations"
+    )
+    
+    trace_validation: bool = Field(
+        default=True,
+        description="Log validation operations"
+    )
+    
+    trace_conversation_flow: bool = Field(
+        default=True,
+        description="Log conversation flow steps"
+    )
+    
     # ============================================
-    # API SETTINGS
+    # LOGGING CONFIGURATION
     # ============================================
-
-    @property
-    def API_HOST(self) -> str:
-        return self._get("API_HOST", "0.0.0.0")
-
-    @property
-    def API_PORT(self) -> int:
-        return self._get("API_PORT", 8765, int)
-
-    @property
-    def API_WORKERS(self) -> int:
-        return self._get("API_WORKERS", 4, int)
-
+    
+    log_to_console: bool = Field(
+        default=True,
+        description="Output logs to console"
+    )
+    
+    log_to_file: bool = Field(
+        default=True,
+        description="Output logs to file"
+    )
+    
+    log_file_path: str = Field(
+        default="logs/legal_advisory.log",
+        description="Path to log file"
+    )
+    
+    log_rotation_size_mb: int = Field(
+        default=10,
+        description="Log file rotation size in MB"
+    )
+    
+    log_retention_days: int = Field(
+        default=7,
+        description="Number of days to retain log files"
+    )
+    
     # ============================================
-    # CORS SETTINGS
+    # EMULATOR TOGGLES
     # ============================================
-
-    @property
-    def CORS_ORIGINS(self) -> str:
-        """CORS allowed origins (comma-separated)"""
-        return self._get("CORS_ORIGINS", "http://localhost:3000")
-
-    @property
-    def cors_origins_list(self) -> list:
-        """CORS origins as a list"""
-        origins = self.CORS_ORIGINS
-        if not origins:
-            return []
-        return [origin.strip() for origin in origins.split(",")]
-
+    
+    use_ai_emulator: bool = Field(
+        default=False,
+        description="Use AI emulator instead of real API (saves costs)"
+    )
+    
+    use_database_emulator: bool = Field(
+        default=False,
+        description="Use in-memory database emulator"
+    )
+    
+    use_matching_emulator: bool = Field(
+        default=False,
+        description="Use matching emulator with predictable results"
+    )
+    
+    use_module_emulator: bool = Field(
+        default=False,
+        description="Use module emulator with minimal tree"
+    )
+    
+    emulator_latency_ms: int = Field(
+        default=50,
+        description="Simulated latency for emulators (milliseconds)"
+    )
+    
     # ============================================
-    # LEGAL MODULE SETTINGS
+    # AI SERVICE CONFIGURATION
     # ============================================
-
-    @property
-    def DEFAULT_MODULE(self) -> str:
-        """Default legal module to use"""
-        return self._get("DEFAULT_MODULE", "ORDER_21")
-
-    @property
-    def MODULE_COMPLETENESS_THRESHOLD(self) -> float:
-        """Threshold for considering data collection complete"""
-        return self._get("MODULE_COMPLETENESS_THRESHOLD", 0.70, float)
-
-    @property
-    def MODULE_AUTO_LOAD(self) -> bool:
-        """Auto-load default module on startup"""
-        return self._get("MODULE_AUTO_LOAD", True, bool)
-
+    
+    claude_api_key: Optional[str] = Field(
+        default=None,
+        description="Anthropic Claude API key"
+    )
+    
+    claude_model: str = Field(
+        default="claude-3-sonnet-20240229",
+        description="Claude model to use"
+    )
+    
+    claude_max_tokens: int = Field(
+        default=4096,
+        description="Maximum tokens for Claude responses"
+    )
+    
+    claude_temperature: float = Field(
+        default=0.7,
+        description="Claude temperature (0-1)"
+    )
+    
+    openai_api_key: Optional[str] = Field(
+        default=None,
+        description="OpenAI API key"
+    )
+    
+    openai_model: str = Field(
+        default="gpt-4",
+        description="OpenAI model to use"
+    )
+    
+    ai_timeout_seconds: int = Field(
+        default=30,
+        description="Timeout for AI API calls"
+    )
+    
+    ai_max_retries: int = Field(
+        default=3,
+        description="Maximum retries for failed AI calls"
+    )
+    
     # ============================================
-    # MATCHING ENGINE SETTINGS
+    # DATABASE CONFIGURATION
     # ============================================
-
-    @property
-    def MATCHING_THRESHOLD(self) -> float:
-        """Minimum confidence for match"""
-        return self._get("MATCHING_THRESHOLD", 0.60, float)
-
-    @property
-    def MAX_MATCHES(self) -> int:
-        """Maximum matches to return"""
-        return self._get("MAX_MATCHES", 5, int)
-
-    @property
-    def MATCHING_ALGORITHM(self) -> str:
-        """Matching algorithm: 'hybrid', 'exact', 'fuzzy'"""
-        return self._get("MATCHING_ALGORITHM", "hybrid")
-
+    
+    database_url: str = Field(
+        default="postgresql://localhost:5432/legal_advisory",
+        description="Database connection URL"
+    )
+    
+    database_pool_size: int = Field(
+        default=5,
+        description="Database connection pool size"
+    )
+    
+    database_max_overflow: int = Field(
+        default=10,
+        description="Maximum database connection overflow"
+    )
+    
+    redis_url: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis connection URL for caching"
+    )
+    
+    cache_ttl_seconds: int = Field(
+        default=3600,
+        description="Default cache TTL in seconds"
+    )
+    
     # ============================================
-    # AI SERVICE SETTINGS
+    # API CONFIGURATION
     # ============================================
-
-    @property
-    def AI_ENABLED(self) -> bool:
-        """Enable AI services"""
-        return self._get("AI_ENABLED", True, bool)
-
-    @property
-    def AI_FALLBACK_TO_EMULATOR(self) -> bool:
-        """Fallback to emulator if AI fails"""
-        return self._get("AI_FALLBACK_TO_EMULATOR", True, bool)
-
-    @property
-    def AI_RETRY_ATTEMPTS(self) -> int:
-        """Number of retry attempts for AI calls"""
-        return self._get("AI_RETRY_ATTEMPTS", 3, int)
-
-    @property
-    def AI_RETRY_DELAY(self) -> float:
-        """Delay between retries (seconds)"""
-        return self._get("AI_RETRY_DELAY", 1.0, float)
-
-    @property
-    def AI_TIMEOUT(self) -> int:
-        """AI call timeout (seconds)"""
-        return self._get("AI_TIMEOUT", 30, int)
-
-    @property
-    def AI_MAX_TOKENS(self) -> int:
-        """Maximum tokens for AI response"""
-        return self._get("AI_MAX_TOKENS", 4096, int)
-
-    # Anthropic Claude
-    @property
-    def ANTHROPIC_API_KEY(self) -> Optional[str]:
-        return self._get("ANTHROPIC_API_KEY")
-
-    @property
-    def ANTHROPIC_MODEL(self) -> str:
-        return self._get("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
-
-    # OpenAI
-    @property
-    def OPENAI_API_KEY(self) -> Optional[str]:
-        return self._get("OPENAI_API_KEY")
-
-    @property
-    def OPENAI_MODEL(self) -> str:
-        return self._get("OPENAI_MODEL", "gpt-4-turbo-preview")
-
+    
+    api_host: str = Field(
+        default="0.0.0.0",
+        description="API server host"
+    )
+    
+    api_port: int = Field(
+        default=8000,
+        description="API server port"
+    )
+    
+    api_workers: int = Field(
+        default=4,
+        description="Number of API workers"
+    )
+    
+    cors_origins: list = Field(
+        default=["http://localhost:3000", "http://localhost:5173"],
+        description="Allowed CORS origins"
+    )
+    
+    api_prefix: str = Field(
+        default="/api/v1",
+        description="API route prefix"
+    )
+    
     # ============================================
-    # DATABASE SETTINGS
+    # MATCHING ENGINE CONFIGURATION
     # ============================================
-
-    @property
-    def DATABASE_URL(self) -> str:
-        return self._get("DATABASE_URL", "sqlite:///legal_advisory.db")
-
-    @property
-    def DATABASE_POOL_SIZE(self) -> int:
-        return self._get("DATABASE_POOL_SIZE", 10, int)
-
-    @property
-    def DATABASE_MAX_OVERFLOW(self) -> int:
-        return self._get("DATABASE_MAX_OVERFLOW", 20, int)
-
+    
+    matching_threshold: float = Field(
+        default=0.6,
+        description="Minimum confidence threshold for matches (0-1)"
+    )
+    
+    matching_max_results: int = Field(
+        default=5,
+        description="Maximum number of match results to return"
+    )
+    
+    matching_dimension_weights: dict = Field(
+        default={
+            "WHAT": 0.25,
+            "WHICH": 0.20,
+            "IF_THEN": 0.20,
+            "MODALITY": 0.15,
+            "GIVEN": 0.10,
+            "WHY": 0.10
+        },
+        description="Weights for each matching dimension"
+    )
+    
     # ============================================
-    # CACHE SETTINGS
+    # ANALYSIS ENGINE CONFIGURATION
     # ============================================
-
-    @property
-    def CACHE_ENABLED(self) -> bool:
-        return self._get("CACHE_ENABLED", True, bool)
-
-    @property
-    def CACHE_DEFAULT_TTL(self) -> int:
-        """Default cache TTL in seconds"""
-        return self._get("CACHE_DEFAULT_TTL", 3600, int)
-
-    @property
-    def REDIS_URL(self) -> Optional[str]:
-        return self._get("REDIS_URL")
-
+    
+    analysis_timeout_seconds: int = Field(
+        default=60,
+        description="Timeout for complete analysis"
+    )
+    
+    analysis_max_iterations: int = Field(
+        default=10,
+        description="Maximum analysis iterations"
+    )
+    
+    analysis_min_confidence: float = Field(
+        default=0.7,
+        description="Minimum confidence for analysis results"
+    )
+    
     # ============================================
-    # PERFORMANCE SETTINGS
+    # CONVERSATION CONFIGURATION
     # ============================================
-
-    @property
-    def MAX_WORKERS(self) -> int:
-        """Max worker threads for async operations"""
-        return self._get("MAX_WORKERS", 4, int)
-
-    @property
-    def REQUEST_TIMEOUT(self) -> int:
-        """Request timeout in seconds"""
-        return self._get("REQUEST_TIMEOUT", 30, int)
-
-    @property
-    def BATCH_SIZE(self) -> int:
-        """Batch size for bulk operations"""
-        return self._get("BATCH_SIZE", 100, int)
-
+    
+    conversation_max_turns: int = Field(
+        default=50,
+        description="Maximum turns in a conversation"
+    )
+    
+    session_timeout_minutes: int = Field(
+        default=30,
+        description="Session timeout in minutes"
+    )
+    
+    session_max_history_size: int = Field(
+        default=100,
+        description="Maximum conversation turns to keep in memory"
+    )
+    
+    session_persistence_enabled: bool = Field(
+        default=True,
+        description="Enable session persistence to database"
+    )
+    
     # ============================================
-    # LOGGING SETTINGS
+    # SECURITY
     # ============================================
+    
+    secret_key: str = Field(
+        default="development-secret-key-change-in-production",
+        description="Secret key for sessions/tokens"
+    )
+    
+    enable_rate_limiting: bool = Field(
+        default=True,
+        description="Enable API rate limiting"
+    )
+    
+    rate_limit_per_minute: int = Field(
+        default=60,
+        description="Requests per minute per IP"
+    )
+    
+    enable_authentication: bool = Field(
+        default=False,
+        description="Enable user authentication"
+    )
+    
+    # ============================================
+    # MONITORING & METRICS
+    # ============================================
+    
+    enable_metrics: bool = Field(
+        default=True,
+        description="Enable metrics collection"
+    )
+    
+    metrics_export_interval_seconds: int = Field(
+        default=60,
+        description="Metrics export interval"
+    )
+    
+    enable_health_checks: bool = Field(
+        default=True,
+        description="Enable health check endpoints"
+    )
+    
+    health_check_interval_seconds: int = Field(
+        default=30,
+        description="Health check interval"
+    )
+    
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False,
+        "extra": "ignore"
+    }
 
-    @property
-    def LOG_LEVEL(self) -> str:
-        if self.is_production:
-            return self._get("LOG_LEVEL", "WARNING")
-        return self._get("LOG_LEVEL", "INFO")
 
-    @property
-    def LOG_FORMAT(self) -> str:
-        return "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+# ============================================
+# GLOBAL SETTINGS INSTANCE
+# ============================================
 
-    @property
-    def LOG_FILE(self) -> Optional[str]:
-        return self._get("LOG_FILE")
+_settings: Optional[Settings] = None
 
 
-@lru_cache()
-def get_settings(**overrides) -> Settings:
+def get_settings() -> Settings:
     """
-    Get cached settings instance
-
-    Usage:
-        settings = get_settings()
-        settings = get_settings(ENVIRONMENT="testing")
+    Get global settings instance (singleton pattern).
+    
+    Returns cached instance after first call for performance.
     """
-    return Settings(**overrides)
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings
+
+
+def reload_settings():
+    """Force reload settings from environment"""
+    global _settings
+    _settings = None
+    return get_settings()
+
+
+# ============================================
+# CONVENIENCE FUNCTIONS
+# ============================================
+
+def is_debug_enabled() -> bool:
+    """
+    Quick check if ANY debugging is enabled.
+    
+    This is the FIRST check in all debug decorators.
+    Returns False in production for zero overhead.
+    """
+    settings = get_settings()
+    return settings.debug_enabled and settings.debug_level != DebugLevel.NONE
+
+
+def is_production() -> bool:
+    """Check if running in production environment"""
+    return get_settings().environment == Environment.PRODUCTION
+
+
+def is_development() -> bool:
+    """Check if running in development environment"""
+    return get_settings().environment == Environment.DEVELOPMENT
+
+
+def is_testing() -> bool:
+    """Check if running in testing environment"""
+    return get_settings().environment == Environment.TESTING
+
+
+def get_log_level() -> str:
+    """Get appropriate Python logging level"""
+    settings = get_settings()
+    level_map = {
+        DebugLevel.NONE: "CRITICAL",
+        DebugLevel.ERROR: "ERROR",
+        DebugLevel.WARNING: "WARNING",
+        DebugLevel.INFO: "INFO",
+        DebugLevel.DEBUG: "DEBUG",
+        DebugLevel.TRACE: "DEBUG"
+    }
+    return level_map.get(settings.debug_level, "INFO")
