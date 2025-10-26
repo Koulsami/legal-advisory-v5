@@ -13,8 +13,11 @@ from typing import Any, Dict, List, Optional
 from backend.common_services.analysis_engine import AnalysisEngine
 from backend.common_services.module_registry import ModuleRegistry
 from backend.common_services.pattern_extractor import PatternExtractor
+from backend.common_services.gap_detector import GapDetector
 from backend.common_services.logging_config import get_logger, log_extraction, log_conversation_flow, log_calculation
 from backend.hybrid_ai.hybrid_orchestrator import HybridAIOrchestrator
+from backend.hybrid_ai.hybrid_turn_manager import HybridTurnManager
+from backend.hybrid_ai.natural_question_generator import NaturalQuestionGenerator
 
 # Set up logging
 logger = get_logger(__name__)
@@ -58,6 +61,16 @@ class ConversationManager:
         self._module_registry = module_registry
         self._pattern_extractor = PatternExtractor()
 
+        # Initialize hybrid architecture components
+        self._gap_detector = GapDetector(module_registry.tree_framework)
+        self._question_generator = NaturalQuestionGenerator(hybrid_ai._ai_service)
+        self._hybrid_turn_manager = HybridTurnManager(
+            ai_service=hybrid_ai._ai_service,
+            gap_detector=self._gap_detector,
+            pattern_extractor=self._pattern_extractor,
+            question_generator=self._question_generator,
+        )
+
         # In-memory session store (will be replaced with Redis/Database in Phase 7)
         self._sessions: Dict[str, ConversationSession] = {}
 
@@ -67,6 +80,8 @@ class ConversationManager:
             "total_messages": 0,
             "completed_sessions": 0,
         }
+
+        logger.info("ConversationManager initialized with HYBRID architecture")
 
     # ============================================
     # SESSION MANAGEMENT
@@ -141,14 +156,14 @@ class ConversationManager:
         self, user_message: str, session_id: str
     ) -> ConversationResponse:
         """
-        Main entry point for processing user messages.
+        Main entry point for processing user messages - HYBRID VERSION.
 
-        Flow:
-        1. Load/validate session
+        HYBRID FLOW (AI + Logic Tree):
+        1. Load session
         2. Add user message to history
-        3. Extract information from message
-        4. Determine next action
-        5. Execute action (ask question, analyze, or complete)
+        3. **HYBRID TURN**: AI extracts + Logic Tree validates + Gap detection
+        4. If complete → Calculate
+        5. If gaps → AI asks naturally
         6. Save session
         7. Return response
 
@@ -177,21 +192,53 @@ class ConversationManager:
         self._stats["total_messages"] += 1
 
         try:
-            # Extract information from user message
-            await self._extract_information(user_message, session)
+            # Select module if not selected
+            if not session.module_id:
+                await self._select_module(session)
 
-            # Determine next action
-            next_action = self._determine_next_action(session)
+            # ========================================
+            # HYBRID TURN: AI + Logic Tree
+            # ========================================
+            conversation_history = [
+                {"role": msg.role.value, "content": msg.content}
+                for msg in session.messages
+            ]
 
-            if next_action == "analyze":
-                # Enough information - perform analysis
+            hybrid_result = await self._hybrid_turn_manager.process_turn(
+                user_message=user_message,
+                module_id=session.module_id,
+                filled_fields=session.filled_fields,
+                conversation_history=conversation_history,
+            )
+
+            logger.info(
+                f"Hybrid turn result: status={hybrid_result['status']}, "
+                f"completeness={hybrid_result['completeness_score']:.0%}"
+            )
+
+            # Update session with extracted fields
+            session.filled_fields = hybrid_result["filled_fields"]
+            session.completeness_score = hybrid_result["completeness_score"]
+
+            # Create response based on hybrid result
+            if hybrid_result["status"] == "complete":
+                # We have all information - perform calculation
                 response = await self._perform_analysis(session)
-            elif next_action == "select_module":
-                # Need to select module first
-                response = await self._select_module(session)
-            else:  # ask_question
-                # Need more information
-                response = await self._ask_for_information(session)
+            else:
+                # Still gathering - return the gap questions
+                response = ConversationResponse(
+                    message=hybrid_result["message"],
+                    session_id=session_id,
+                    status=ConversationStatus.ACTIVE,
+                    completeness_score=hybrid_result["completeness_score"],
+                    next_action=hybrid_result["next_action"],
+                    questions=[],  # Questions are embedded in message now
+                    result=None,
+                    metadata={
+                        "gaps": hybrid_result.get("gaps", []),
+                        "newly_extracted": hybrid_result.get("newly_extracted", {}),
+                    },
+                )
 
             # Add assistant message to history
             assistant_msg = ConversationMessage(
@@ -208,6 +255,7 @@ class ConversationManager:
 
         except Exception as e:
             # Error handling
+            logger.error(f"Error processing message: {e}", exc_info=True)
             session.status = ConversationStatus.ERROR
             self.save_session(session)
 
