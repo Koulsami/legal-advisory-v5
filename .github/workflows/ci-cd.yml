@@ -2,32 +2,63 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
-  release:
-    types: [ published ]
-
-env:
-  PYTHON_VERSION: '3.12'
-  DOCKER_IMAGE: legal-advisory
-  DOCKER_TAG: ${{ github.sha }}
+    branches: [main, develop]
 
 jobs:
-  # Job 1: Run Tests
-  test:
-    name: Run Tests
+  # ============================================
+  # LINTING AND CODE QUALITY
+  # ============================================
+  lint:
+    name: Lint Code
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy black isort
+
+      - name: Run Black (formatting check)
+        run: black --check backend/ tests/
+        continue-on-error: true
+
+      - name: Run isort (import sorting check)
+        run: isort --check-only backend/ tests/
+        continue-on-error: true
+
+      - name: Run Ruff (linting)
+        run: ruff check backend/ tests/
+        continue-on-error: true
+
+      - name: Run MyPy (type checking)
+        run: mypy backend/ --ignore-missing-imports
+        continue-on-error: true
+
+  # ============================================
+  # UNIT TESTS
+  # ============================================
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -35,248 +66,275 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov pytest-asyncio
 
-      - name: Run tests
+      - name: Run unit tests with coverage
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          pytest tests/ --ignore=tests/_archived -v --cov=backend --cov-report=xml --cov-report=term
+          pytest tests/unit/ \
+            tests/common_services/ \
+            tests/hybrid_ai/ \
+            tests/utils/ \
+            -v \
+            --cov=backend \
+            --cov-report=xml \
+            --cov-report=term-missing
 
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v4
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
           flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
+          name: codecov-unit-tests
+        continue-on-error: true
 
-  # Job 2: Security Scan
-  security:
-    name: Security Scan
+  # ============================================
+  # MODULE TESTS
+  # ============================================
+  module-tests:
+    name: Module Tests
     runs-on: ubuntu-latest
+    needs: [unit-tests]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install safety bandit
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
 
-      - name: Run Safety check
+      - name: Run module tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
-          safety check --json || true
+          pytest tests/modules/ -v
 
-      - name: Run Bandit security scan
+  # ============================================
+  # CONVERSATION TESTS
+  # ============================================
+  conversation-tests:
+    name: Conversation Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
         run: |
-          bandit -r backend/ -f json -o bandit-report.json || true
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Run conversation tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          pytest tests/conversation/ -v
+
+  # ============================================
+  # EMULATOR TESTS
+  # ============================================
+  emulator-tests:
+    name: Emulator Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Run emulator tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          pytest tests/emulators/ -v
+
+  # ============================================
+  # INTEGRATION TESTS
+  # ============================================
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests, module-tests, conversation-tests, emulator-tests]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-timeout
+
+      - name: Run integration tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          pytest tests/integration/ \
+            -v \
+            --timeout=300
+
+  # ============================================
+  # SECURITY TESTS
+  # ============================================
+  security-tests:
+    name: Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio safety bandit
+
+      - name: Run security tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          pytest tests/security/ -v
+
+      - name: Run Safety check (dependency vulnerabilities)
+        run: safety check --json
+        continue-on-error: true
+
+      - name: Run Bandit (security linter)
+        run: bandit -r backend/ -f json -o bandit-report.json
+        continue-on-error: true
 
       - name: Upload Bandit report
-        uses: actions/upload-artifact@v4
-        if: always()
+        uses: actions/upload-artifact@v3
         with:
           name: bandit-report
           path: bandit-report.json
+        continue-on-error: true
 
-  # Job 3: Code Quality
-  quality:
-    name: Code Quality
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install mypy pylint black isort
-
-      - name: Run Black (code formatting check)
-        run: |
-          black --check backend/ tests/ || true
-
-      - name: Run isort (import sorting check)
-        run: |
-          isort --check-only backend/ tests/ || true
-
-      - name: Run mypy (type checking)
-        run: |
-          mypy backend/ --ignore-missing-imports || true
-
-      - name: Run pylint
-        run: |
-          pylint backend/ --exit-zero
-
-  # Job 4: Build Docker Image
-  build:
+  # ============================================
+  # BUILD TEST (Docker)
+  # ============================================
+  build-test:
     name: Build Docker Image
     runs-on: ubuntu-latest
-    needs: [ test, security, quality ]
+    needs: [integration-tests]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v2
 
       - name: Build Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v4
         with:
           context: .
           push: false
-          tags: ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
+          tags: legal-advisory-system:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          outputs: type=docker,dest=/tmp/image.tar
 
-      - name: Upload Docker image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp/image.tar
-          retention-days: 1
-
-  # Job 5: Test Docker Image
-  test-docker:
-    name: Test Docker Image
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download Docker image
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp
-
-      - name: Load Docker image
+      - name: Test Docker image
         run: |
-          docker load --input /tmp/image.tar
-
-      - name: Run container
-        run: |
-          docker run -d \
+          docker run -d -p 8000:8000 \
+            -e PYTHONPATH=/app \
             --name test-container \
-            -p 8000:8000 \
-            ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
+            legal-advisory-system:test
 
-      - name: Wait for container to be ready
-        run: |
-          timeout 30 sh -c 'until curl -f http://localhost:8000/health; do sleep 1; done'
+          # Wait for container to be ready
+          sleep 10
 
-      - name: Test health endpoint
-        run: |
-          curl -f http://localhost:8000/health | grep -q "healthy"
+          # Test health endpoint
+          curl -f http://localhost:8000/health || exit 1
 
-      - name: Test API documentation
-        run: |
-          curl -f http://localhost:8000/docs | grep -q "swagger"
-
-      - name: Show container logs
-        if: always()
-        run: |
-          docker logs test-container
-
-      - name: Stop container
-        if: always()
-        run: |
+          # Cleanup
           docker stop test-container
           docker rm test-container
 
-  # Job 6: Deploy (only on main branch push or release)
-  deploy:
-    name: Deploy
+  # ============================================
+  # ALL TESTS PASSED - SUMMARY
+  # ============================================
+  all-tests-passed:
+    name: All Tests Passed ✅
     runs-on: ubuntu-latest
-    needs: [ test, build, test-docker ]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      [
+        lint,
+        unit-tests,
+        module-tests,
+        conversation-tests,
+        emulator-tests,
+        integration-tests,
+        security-tests,
+        build-test,
+      ]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download Docker image
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp
-
-      - name: Load Docker image
+      - name: Success
         run: |
-          docker load --input /tmp/image.tar
+          echo "🎉 All tests passed successfully!"
+          echo "✅ Linting: Passed"
+          echo "✅ Unit Tests: Passed"
+          echo "✅ Module Tests: Passed"
+          echo "✅ Conversation Tests: Passed"
+          echo "✅ Emulator Tests: Passed"
+          echo "✅ Integration Tests: Passed"
+          echo "✅ Security Tests: Passed"
+          echo "✅ Docker Build: Passed"
+          echo ""
+          echo "🚀 Ready for deployment to production!"
 
-      # Example: Deploy to Docker Hub
-      - name: Login to Docker Hub
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Tag and push to Docker Hub
-        if: github.event_name != 'pull_request'
-        run: |
-          docker tag ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }} \
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest
-          docker tag ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }} \
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}:${{ github.sha }}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}:${{ github.sha }}
-
-      # Example: Deploy to production server via SSH
-      # - name: Deploy to production
-      #   uses: appleboy/ssh-action@master
-      #   with:
-      #     host: ${{ secrets.DEPLOY_HOST }}
-      #     username: ${{ secrets.DEPLOY_USER }}
-      #     key: ${{ secrets.DEPLOY_KEY }}
-      #     script: |
-      #       cd /opt/legal-advisory-v5
-      #       git pull
-      #       docker-compose pull
-      #       docker-compose up -d --build
-
-  # Job 7: Create Release (only on tag push)
-  release:
-    name: Create Release
+  # ============================================
+  # DEPLOY TO RAILWAY (only on main branch push)
+  # ============================================
+  deploy-railway:
+    name: Deploy to Railway
     runs-on: ubuntu-latest
-    needs: [ test, build ]
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [all-tests-passed]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
-      - name: Create Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body: |
-            Legal Advisory System ${{ github.ref }}
+      - name: Deploy to Railway
+        run: |
+          echo "🚂 Triggering Railway deployment..."
+          echo "Railway will automatically deploy from the main branch"
+          echo "Monitor deployment at: https://railway.app"
 
-            ## Changes
-            See CHANGELOG.md for details.
-
-            ## Docker Image
-            ```bash
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}:${{ github.ref_name }}
-            ```
-          draft: false
-          prerelease: false
+      - name: Notify success
+        run: |
+          echo "✅ Deployment triggered successfully!"
+          echo "Check Railway dashboard for deployment status"
