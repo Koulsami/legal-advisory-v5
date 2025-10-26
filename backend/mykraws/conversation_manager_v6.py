@@ -304,7 +304,7 @@ class ConversationManagerV6:
                 response = await self._handle_phase_1_greeting(session)
 
             elif session.current_phase == ConversationPhase.ASK_HELP:
-                response = await self._handle_phase_2_ask_help(session)
+                response = await self._handle_phase_2_ask_help(session, user_message)
 
             elif session.current_phase == ConversationPhase.INTERROGATION:
                 response = await self._handle_phase_3_interrogation(session, user_message)
@@ -375,7 +375,8 @@ class ConversationManagerV6:
 
     async def _handle_phase_2_ask_help(
         self,
-        session: ConversationSessionV6
+        session: ConversationSessionV6,
+        user_message: str
     ) -> Dict[str, Any]:
         """
         Phase 2: Understanding User Need
@@ -387,10 +388,9 @@ class ConversationManagerV6:
         # Generate help question
         help_question = self.personality.generate_help_question()
 
-        # If user already responded, identify module
-        if session.messages and len(session.messages) > 0:
-            # Last message should be user's response to greeting
-            user_response = session.messages[-1]["content"]
+        # If user provided a message, identify module and extract info
+        if user_message:
+            user_response = user_message
 
             # Identify module (simple keyword matching for now)
             # TODO: Use AI for better intent recognition
@@ -402,6 +402,27 @@ class ConversationManagerV6:
 
                 logger.info(f"[{session.session_id[:8]}] Module identified: {module_id}")
 
+                # CRITICAL: Extract any information from user's initial message
+                # User may have provided details like "High Court default judgment for $50k"
+                extracted = {}
+                if self.ai_interrogator:
+                    from backend.common_services.pattern_extractor import PatternExtractor
+                    pattern_extractor = PatternExtractor()
+
+                    logger.info(f"[{session.session_id[:8]}] Extracting from: '{user_response}'")
+
+                    extracted = pattern_extractor.extract_all(
+                        user_response,
+                        context={"current_fields": session.filled_fields}
+                    )
+
+                    logger.info(f"[{session.session_id[:8]}] Phase 2 extraction: {len(extracted)} fields found: {list(extracted.keys())}")
+
+                    # Update session with extracted fields
+                    for field, value in extracted.items():
+                        session.filled_fields[field] = value
+                        logger.info(f"[{session.session_id[:8]}] Extracted from Phase 2: {field} = {value}")
+
                 # Acknowledge and transition to Phase 3
                 acknowledgment = f"{self.personality.acknowledge_response(user_response)} I can help you with that."
                 return {
@@ -410,7 +431,8 @@ class ConversationManagerV6:
                     "continue_conversation": True,
                     "metadata": {
                         "module_identified": module_id,
-                        "transitioning_to_phase_3": True
+                        "transitioning_to_phase_3": True,
+                        "fields_extracted": len(extracted) if 'extracted' in locals() else 0
                     }
                 }
 

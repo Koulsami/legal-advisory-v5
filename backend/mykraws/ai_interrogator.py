@@ -117,7 +117,7 @@ class AIInterrogator:
             return "Could you tell me more about your case?"
 
         # 6. Generate natural question using AI
-        if self.ai_service and hasattr(self.ai_service, 'client') and self.ai_service.client:
+        if self.ai_service and hasattr(self.ai_service, '_client') and self.ai_service._client:
             question = await self._generate_ai_question(context, next_gap)
         else:
             # Fallback: structured question
