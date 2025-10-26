@@ -27,7 +27,9 @@ app = FastAPI(
 )
 
 # Configure CORS
-allowed_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+# Default to Netlify frontend + localhost for development
+default_origins = "https://legaladvisory.netlify.app,http://localhost:3000,http://localhost:5173"
+allowed_origins = os.getenv("CORS_ORIGINS", default_origins).split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
