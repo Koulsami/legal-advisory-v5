@@ -120,9 +120,9 @@ class AIInterrogator:
         if self.ai_service and hasattr(self.ai_service, '_client') and self.ai_service._client:
             question = await self._generate_ai_question(context, next_gap)
         else:
-            # Fallback: structured question
+            # Fallback: structured question (with acknowledgment)
             logger.warning("AI service not available - using structured question")
-            question = self._generate_structured_question(next_gap)
+            question = self._generate_structured_question(next_gap, user_message, context)
 
         logger.info(f"Generated question about: {next_gap['field_name']}")
         return question
@@ -486,33 +486,67 @@ Generate your question now:
 
         return prompt
 
-    def _generate_structured_question(self, gap: Dict[str, Any]) -> str:
+    def _generate_structured_question(
+        self,
+        gap: Dict[str, Any],
+        user_message: str,
+        context: InterrogationContext
+    ) -> str:
         """
         Generate structured question as fallback (when AI unavailable).
 
+        Even without AI, tries to be conversational by:
+        - Acknowledging what user said
+        - Explaining why we need the information
+
         Args:
             gap: Information gap
+            user_message: What user just said
+            context: Full context
 
         Returns:
-            Structured question
+            Conversational structured question
         """
         field_name = gap["field_name"]
         description = gap["description"]
 
-        # Map field names to natural questions
-        question_map = {
-            "court_level": "Which court is your matter in - High Court, District Court, or Magistrates Court?",
-            "case_type": "What type of judgment or proceeding is this? For example, was it a default judgment, summary judgment, or a contested trial?",
-            "claim_amount": "What is the amount claimed or in dispute? This helps determine the appropriate cost scale.",
+        # Generate acknowledgment for user's message
+        acknowledgment = ""
+        if user_message:
+            # Detect specific question types
+            user_lower = user_message.lower()
+
+            if "name" in user_lower:
+                acknowledgment = "I'm MyKraws, your friendly legal advisor! "
+            elif "why" in user_lower or "what" in user_lower:
+                acknowledgment = "Good question! I need this information to calculate accurate costs for you. "
+            elif len(user_message) < 10:
+                # Short response like "ok", etc
+                acknowledgment = "Thanks! "
+            elif context.filled_fields:
+                # User provided some info already
+                acknowledgment = "Got it, thanks! "
+            else:
+                # First real message or unrecognized
+                acknowledgment = ""
+
+        # Base questions without acknowledgment
+        base_questions = {
+            "court_level": "To calculate your costs accurately, I need to know which court your matter is in. Is it High Court, District Court, or Magistrates Court?",
+            "case_type": "Next, what type of judgment or proceeding is this? For example, was it a default judgment, summary judgment, or a contested trial?",
+            "claim_amount": "What is the amount claimed or in dispute? This helps determine the appropriate cost scale under Order 21.",
             "trial_days": "How many days did the trial last? This affects the cost calculation for contested trials.",
             "complexity_level": "How would you describe the complexity of your matter - straightforward, moderate, or complex?"
         }
 
-        if field_name in question_map:
-            return question_map[field_name]
+        # Get base question
+        if field_name in base_questions:
+            base_question = base_questions[field_name]
+        else:
+            base_question = f"Could you tell me about the {description.lower()}?"
 
-        # Generic fallback
-        return f"Could you tell me about the {description.lower()}?"
+        # Add acknowledgment prefix
+        return f"{acknowledgment}{base_question}"
 
     def _generate_sufficiency_message(self, context: InterrogationContext) -> str:
         """
