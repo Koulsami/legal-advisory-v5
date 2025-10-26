@@ -21,6 +21,10 @@ RUN apt-get update && \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy startup script
+COPY start.sh .
+RUN chmod +x start.sh
+
 # Copy application code
 COPY backend ./backend
 COPY tests ./tests
@@ -42,4 +46,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 EXPOSE 8000
 
 # Run the application
-CMD uvicorn backend.api.routes:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD ["./start.sh"]
