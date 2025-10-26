@@ -1,5 +1,10 @@
 # Legal Advisory System v5.0 - Docker Ignore File
 
+# IMPORTANT: Include these files (negated patterns)
+!requirements.txt
+!backend/requirements.txt
+!pyproject.toml
+
 # Python
 __pycache__/
 *.py[cod]
@@ -51,9 +56,9 @@ coverage.xml
 .travis.yml
 
 # Docker
-Dockerfile
 .dockerignore
-docker-compose*.yml
+# Note: Don't exclude Dockerfile - Railway needs it!
+# Note: Don't exclude docker-compose*.yml if needed for local dev
 
 # Local development
 .env.local
