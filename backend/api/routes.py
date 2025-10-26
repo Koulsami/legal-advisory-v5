@@ -76,15 +76,14 @@ logger.info("🚀 Legal Advisory System v5.0 initialized")
 logger.info(f"📊 Registered modules: {module_registry.list_modules()}")
 logger.info(f"🌐 CORS origins: {allowed_origins}")
 
-# Initialize v6 conversation manager for default endpoints
-from backend.mykraws.system_builder import SystemBuilderV6
-v6_builder = SystemBuilderV6(anthropic_api_key=anthropic_api_key)
-conversation_manager_v6 = v6_builder.build()
-logger.info("✅ v6 conversation manager initialized for default endpoints")
-
-# Include v6 routes
+# Include v6 routes (this initializes the v6 system)
 app.include_router(router_v6)
 logger.info("✅ v6 routes mounted at /api/v6/*")
+
+# Import the SAME v6 conversation manager instance from routes_v6
+# (Don't create a new instance - sessions would be separate!)
+from backend.api.routes_v6 import conversation_manager_v6 as conversation_manager_v6
+logger.info("✅ Using shared v6 conversation manager from routes_v6")
 
 
 # ============================================
