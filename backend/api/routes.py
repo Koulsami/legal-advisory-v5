@@ -15,9 +15,15 @@ from backend.common_services.analysis_engine import AnalysisEngine
 from backend.common_services.logic_tree_framework import LogicTreeFramework
 from backend.common_services.matching_engine import UniversalMatchingEngine
 from backend.common_services.module_registry import ModuleRegistry
+from backend.common_services.logging_config import setup_logging, get_logger
 from backend.conversation import ConversationManager
 from backend.hybrid_ai import ClaudeAIService, HybridAIOrchestrator
 from backend.modules.order_21 import Order21Module
+
+# Setup logging
+log_level = os.getenv("LOG_LEVEL", "INFO")
+setup_logging(level=log_level)
+logger = get_logger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -48,12 +54,24 @@ analysis_engine = AnalysisEngine(module_registry, matching_engine, tree_framewor
 order21_module = Order21Module()
 module_registry.register_module(order21_module)
 
-# Initialize Hybrid AI (mock mode by default)
-ai_service = ClaudeAIService(api_key=None)
+# Initialize Hybrid AI with real Claude API if key is provided
+anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+if anthropic_api_key:
+    logger.info("✅ Initializing with REAL Claude AI (API key found)")
+    ai_service = ClaudeAIService(api_key=anthropic_api_key)
+else:
+    logger.warning("⚠️  No ANTHROPIC_API_KEY found - running in MOCK mode (degraded UX)")
+    logger.warning("⚠️  Set ANTHROPIC_API_KEY environment variable for full functionality")
+    ai_service = ClaudeAIService(api_key=None)
+
 hybrid_ai = HybridAIOrchestrator(ai_service)
 
 # Initialize Conversation Manager
 conversation_manager = ConversationManager(hybrid_ai, analysis_engine, module_registry)
+
+logger.info("🚀 Legal Advisory System v5.0 initialized")
+logger.info(f"📊 Registered modules: {list(module_registry.list_modules().keys())}")
+logger.info(f"🌐 CORS origins: {allowed_origins}")
 
 
 # ============================================
@@ -150,6 +168,47 @@ async def health():
     )
 
 
+@app.get("/debug/session/{session_id}")
+async def debug_session(session_id: str):
+    """
+    Debug endpoint - shows complete session state for troubleshooting.
+
+    Shows:
+    - Filled fields
+    - Missing fields
+    - Completeness score
+    - Message history
+    - Module ID
+
+    This helps diagnose why extraction or flow is failing.
+    """
+    session = conversation_manager.get_session(session_id)
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    return {
+        "session_id": session.session_id,
+        "user_id": session.user_id,
+        "status": session.status.value,
+        "module_id": session.module_id,
+        "filled_fields": session.filled_fields,
+        "missing_fields": session.missing_fields,
+        "completeness_score": session.completeness_score,
+        "message_count": len(session.messages),
+        "messages": [
+            {
+                "role": msg.role.value,
+                "content": msg.content,
+                "timestamp": msg.timestamp.isoformat(),
+            }
+            for msg in session.messages
+        ],
+        "created_at": session.created_at.isoformat(),
+        "updated_at": session.updated_at.isoformat(),
+    }
+
+
 # ============================================
 # SESSION ENDPOINTS
 # ============================================
@@ -210,9 +269,13 @@ async def list_sessions(user_id: Optional[str] = None):
 @app.post("/messages", response_model=MessageResponse)
 async def send_message(request: MessageRequest):
     """Send message in conversation"""
+    logger.info(f"📨 Message received: session={request.session_id[:8]}, message='{request.message[:50]}...'")
+
     response = await conversation_manager.process_message(
         user_message=request.message, session_id=request.session_id
     )
+
+    logger.info(f"💬 Response sent: status={response.status.value}, completeness={response.completeness_score:.0%}")
 
     return MessageResponse(
         session_id=response.session_id,

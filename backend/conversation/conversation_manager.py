@@ -12,7 +12,12 @@ from typing import Any, Dict, List, Optional
 
 from backend.common_services.analysis_engine import AnalysisEngine
 from backend.common_services.module_registry import ModuleRegistry
+from backend.common_services.pattern_extractor import PatternExtractor
+from backend.common_services.logging_config import get_logger, log_extraction, log_conversation_flow, log_calculation
 from backend.hybrid_ai.hybrid_orchestrator import HybridAIOrchestrator
+
+# Set up logging
+logger = get_logger(__name__)
 from backend.interfaces import (
     ConversationMessage,
     ConversationResponse,
@@ -51,6 +56,7 @@ class ConversationManager:
         self._hybrid_ai = hybrid_ai
         self._analysis_engine = analysis_engine
         self._module_registry = module_registry
+        self._pattern_extractor = PatternExtractor()
 
         # In-memory session store (will be replaced with Redis/Database in Phase 7)
         self._sessions: Dict[str, ConversationSession] = {}
@@ -261,66 +267,45 @@ class ConversationManager:
         self, user_message: str, session: ConversationSession
     ) -> None:
         """
-        Simple extraction logic (non-AI fallback).
+        Pattern-based extraction logic using robust PatternExtractor.
 
-        Looks for keywords and patterns in user message.
+        Extracts information using regex patterns before trying AI.
+        This is more reliable than AI for common patterns.
 
         Args:
             user_message: User's message
             session: Current session
         """
-        message_lower = user_message.lower()
+        # Use pattern extractor to get all possible fields
+        extracted = self._pattern_extractor.extract_all(
+            user_message,
+            context={"current_fields": session.filled_fields}
+        )
 
-        # Extract court level
-        if "high court" in message_lower:
-            session.filled_fields["court_level"] = "High Court"
-        elif "district court" in message_lower:
-            session.filled_fields["court_level"] = "District Court"
-        elif "magistrate" in message_lower:
-            session.filled_fields["court_level"] = "Magistrates Court"
+        # Log extraction results
+        if extracted:
+            log_extraction(logger, user_message, extracted)
+            log_conversation_flow(
+                logger,
+                session.session_id,
+                "Pattern extraction",
+                {"extracted": extracted}
+            )
 
-        # Extract case type
-        if "default judgment" in message_lower or "default judgement" in message_lower:
+        # Update session with extracted fields (only if not already filled)
+        for field_name, value in extracted.items():
+            if field_name not in session.filled_fields or session.filled_fields.get(field_name) is None:
+                logger.info(f"[{session.session_id[:8]}] Setting {field_name} = {value}")
+                session.filled_fields[field_name] = value
+
+        # Special handling for case type combinations
+        # If we detected "default judgment" + "liquidated", combine them
+        if extracted.get("case_type") == "default_judgment" and extracted.get("claim_nature") == "liquidated":
+            logger.info(f"[{session.session_id[:8]}] Combining: default_judgment + liquidated")
             session.filled_fields["case_type"] = "default_judgment_liquidated"
-        elif "summary judgment" in message_lower or "summary judgement" in message_lower:
-            session.filled_fields["case_type"] = "summary_judgment"
-        elif "trial" in message_lower or "contested" in message_lower:
-            session.filled_fields["case_type"] = "contested_trial"
-        elif "interlocutory" in message_lower or "application" in message_lower:
-            session.filled_fields["case_type"] = "interlocutory_application"
-        elif "appeal" in message_lower:
-            session.filled_fields["case_type"] = "appeal"
-        elif "striking out" in message_lower or "strike out" in message_lower:
-            session.filled_fields["case_type"] = "striking_out"
-
-        # Extract claim amount (look for numbers with $ or SGD)
-        import re
-
-        # Pattern: $XX,XXX or SGD XX,XXX or just numbers
-        amount_patterns = [
-            r"\$\s*([0-9,]+(?:\.[0-9]{2})?)",
-            r"SGD\s*([0-9,]+(?:\.[0-9]{2})?)",
-            r"([0-9,]+(?:\.[0-9]{2})?)\s*dollars?",
-        ]
-
-        for pattern in amount_patterns:
-            match = re.search(pattern, user_message, re.IGNORECASE)
-            if match:
-                amount_str = match.group(1).replace(",", "")
-                try:
-                    session.filled_fields["claim_amount"] = float(amount_str)
-                    break
-                except ValueError:
-                    pass
-
-        # Extract trial days
-        days_pattern = r"([0-9]+)\s*days?"
-        match = re.search(days_pattern, message_lower)
-        if match and "trial" in message_lower:
-            try:
-                session.filled_fields["trial_days"] = int(match.group(1))
-            except ValueError:
-                pass
+        elif extracted.get("case_type") == "default_judgment" and extracted.get("claim_nature") == "unliquidated":
+            logger.info(f"[{session.session_id[:8]}] Combining: default_judgment + unliquidated")
+            session.filled_fields["case_type"] = "default_judgment_unliquidated"
 
     # ============================================
     # ACTION DETERMINATION
