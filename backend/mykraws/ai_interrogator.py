@@ -219,47 +219,81 @@ class AIInterrogator:
             personality_guidelines=personality_guidelines
         )
 
-    def _extract_rules_of_court(self, module) -> List[Dict[str, str]]:
+    def _extract_rules_of_court(self, module) -> List[Dict[str, Any]]:
         """
-        Extract relevant Rules of Court from module.
+        Extract relevant Rules of Court from module's logic tree.
 
-        Returns rules in a format suitable for AI context.
+        Per FR-P3-01, provides:
+        - Rule citations
+        - Rule text (actual legal provisions from logic tree nodes)
+        - Logical deductions (WHAT, WHICH, IF-THEN, MODALITY, GIVEN, WHY)
 
         Args:
             module: Legal module
 
         Returns:
-            List of rule dicts with citation and text
+            List of rule dicts with citation, text, and logical deductions
         """
-        # For Order 21 module, provide key rules
-        # TODO: Extract from actual module metadata
-        rules = [
-            {
-                "citation": "Order 21, Rule 1",
-                "title": "Costs in civil proceedings",
-                "text": "The Court shall have full power to determine by whom and to what extent costs are to be paid."
-            },
-            {
-                "citation": "Order 21, Rule 2",
-                "title": "Assessment of costs",
-                "text": "Costs may be assessed on the standard basis or indemnity basis."
-            },
-            {
-                "citation": "Order 21, Rule 3",
-                "title": "Fixed costs",
-                "text": "Where judgment is obtained by default or on admission, fixed costs apply."
-            },
-            {
-                "citation": "Order 21, Rule 4",
-                "title": "Offers to settle and ADR",
-                "text": "Adverse costs consequences may apply for unreasonable refusal to participate in ADR."
-            },
-            {
-                "citation": "Order 21, Appendix 1",
-                "title": "Fixed Costs Schedule",
-                "text": "Provides specific cost amounts based on court level, case type, and claim amount."
-            }
-        ]
+        rules = []
+
+        # Get logic tree from module registry's tree framework
+        try:
+            tree_framework = self.module_registry.tree_framework
+            logic_tree = tree_framework.get_module_tree(module.metadata.module_id)
+
+            # Extract from each logic tree node
+            for node in logic_tree:
+                rule = {
+                    "citation": node.citation,
+                    "node_id": node.node_id,
+                    "logical_deductions": {}
+                }
+
+                # Extract WHAT (definitions and concepts)
+                if node.what:
+                    rule["logical_deductions"]["WHAT"] = [
+                        w.get("description", str(w)) for w in node.what
+                    ]
+
+                # Extract WHICH (categorizations and types)
+                if node.which:
+                    rule["logical_deductions"]["WHICH"] = [
+                        w.get("description", str(w)) for w in node.which
+                    ]
+
+                # Extract IF-THEN (conditional rules)
+                if node.if_then:
+                    rule["logical_deductions"]["IF_THEN"] = [
+                        f"IF {it.get('condition', '')} THEN {it.get('consequence', '')}"
+                        for it in node.if_then
+                    ]
+
+                # Extract MODALITY (requirements: must/may/shall)
+                if node.modality:
+                    rule["logical_deductions"]["MODALITY"] = [
+                        m.get("description", str(m)) for m in node.modality
+                    ]
+
+                # Extract GIVEN (contextual conditions)
+                if node.given:
+                    rule["logical_deductions"]["GIVEN"] = [
+                        g.get("description", str(g)) for g in node.given
+                    ]
+
+                # Extract WHY (rationale and purpose)
+                if node.why:
+                    rule["logical_deductions"]["WHY"] = [
+                        w.get("description", str(w)) for w in node.why
+                    ]
+
+                # Only include nodes with actual logical deductions
+                if rule["logical_deductions"]:
+                    rules.append(rule)
+
+        except KeyError as e:
+            logger.warning(f"Could not load logic tree: {e}")
+        except Exception as e:
+            logger.error(f"Error extracting rules: {e}")
 
         return rules
 
@@ -394,11 +428,16 @@ class AIInterrogator:
             f"- {k}: {v}" for k, v in context.filled_fields.items()
         ) if context.filled_fields else "None yet"
 
-        # Format rules for context
-        rules_summary = "\n".join(
-            f"{r['citation']}: {r['text']}"
-            for r in context.rules_of_court
-        )
+        # Format rules for context with logical deductions
+        rules_lines = []
+        for r in context.rules_of_court:
+            rules_lines.append(f"\n{r['citation']}:")
+            for deduction_type, deductions in r.get('logical_deductions', {}).items():
+                if deductions:
+                    rules_lines.append(f"  {deduction_type}:")
+                    for deduction in deductions:
+                        rules_lines.append(f"    - {deduction}")
+        rules_summary = "\n".join(rules_lines) if rules_lines else "No rules loaded"
 
         # Format recent conversation
         conv_summary = "\n".join(
