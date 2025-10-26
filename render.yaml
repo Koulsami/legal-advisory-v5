@@ -1,0 +1,47 @@
+# Legal Advisory System v5.0 - Render Configuration
+# https://render.com/docs/yaml-spec
+
+services:
+  # Main API Service
+  - type: web
+    name: legal-advisory-api
+    runtime: python
+    plan: starter  # Can upgrade to standard/pro
+    region: singapore  # Closest to target market
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn backend.api.routes:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: PYTHONPATH
+        value: /opt/render/project/src
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: WORKERS
+        value: 4
+      # Add secrets in Render dashboard:
+      # - ANTHROPIC_API_KEY
+      # - SECRET_KEY
+      # - DATABASE_URL (when integrated)
+      # - REDIS_URL (when integrated)
+    healthCheckPath: /health
+    autoDeploy: true  # Auto-deploy on git push
+
+  # PostgreSQL Database (Optional - uncomment when needed)
+  # - type: postgres
+  #   name: legal-advisory-db
+  #   databaseName: legaldb
+  #   user: legaluser
+  #   plan: starter
+  #   region: singapore
+  #   postgresMajorVersion: 16
+
+  # Redis Cache (Optional - uncomment when needed)
+  # - type: redis
+  #   name: legal-advisory-cache
+  #   plan: starter
+  #   region: singapore
+  #   maxmemoryPolicy: allkeys-lru
+  #   ipAllowList: []  # Empty = accessible from any Render service

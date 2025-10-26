@@ -1,0 +1,36 @@
+# Legal Advisory System v5.0 - Development Docker Compose
+# Simplified configuration for development and testing
+
+version: '3.8'
+
+services:
+  # Main API Service (Development Mode)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: legal-advisory-dev
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+      - ENVIRONMENT=development
+      - LOG_LEVEL=debug
+      - CORS_ORIGINS=*
+    volumes:
+      # Mount source code for hot reload
+      - ./backend:/app/backend
+      - ./tests:/app/tests
+    command: uvicorn backend.api.routes:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    networks:
+      - legal-dev-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  legal-dev-network:
+    driver: bridge
