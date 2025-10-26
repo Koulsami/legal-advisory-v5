@@ -48,3 +48,4 @@ Thumbs.db
 
 # Project specific
 tests/_archived/
+coverage.xml

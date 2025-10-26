@@ -70,7 +70,7 @@ hybrid_ai = HybridAIOrchestrator(ai_service)
 conversation_manager = ConversationManager(hybrid_ai, analysis_engine, module_registry)
 
 logger.info("🚀 Legal Advisory System v5.0 initialized")
-logger.info(f"📊 Registered modules: {list(module_registry.list_modules().keys())}")
+logger.info(f"📊 Registered modules: {module_registry.list_modules()}")
 logger.info(f"🌐 CORS origins: {allowed_origins}")
 
 
