@@ -6,8 +6,10 @@ FastAPI routes for the Legal Advisory System.
 """
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
+import os
 
 from backend.common_services.analysis_engine import AnalysisEngine
 from backend.common_services.logic_tree_framework import LogicTreeFramework
@@ -22,6 +24,16 @@ app = FastAPI(
     title="Legal Advisory System v5.0",
     description="Hybrid AI-powered legal cost advisory system for Singapore Rules of Court",
     version="5.0.0",
+)
+
+# Configure CORS
+allowed_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Initialize components
