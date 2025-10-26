@@ -18,6 +18,7 @@ from backend.common_services.logging_config import get_logger, log_extraction, l
 from backend.hybrid_ai.hybrid_orchestrator import HybridAIOrchestrator
 from backend.hybrid_ai.hybrid_turn_manager import HybridTurnManager
 from backend.hybrid_ai.natural_question_generator import NaturalQuestionGenerator
+from backend.hybrid_ai.result_explainer import ResultExplainer
 
 # Set up logging
 logger = get_logger(__name__)
@@ -64,6 +65,7 @@ class ConversationManager:
         # Initialize hybrid architecture components
         self._gap_detector = GapDetector(module_registry.tree_framework)
         self._question_generator = NaturalQuestionGenerator(hybrid_ai._ai_service)
+        self._result_explainer = ResultExplainer(hybrid_ai._ai_service)
         self._hybrid_turn_manager = HybridTurnManager(
             ai_service=hybrid_ai._ai_service,
             gap_detector=self._gap_detector,
@@ -81,7 +83,7 @@ class ConversationManager:
             "completed_sessions": 0,
         }
 
-        logger.info("ConversationManager initialized with HYBRID architecture")
+        logger.info("ConversationManager initialized with HYBRID architecture + ResultExplainer")
 
     # ============================================
     # SESSION MANAGEMENT
@@ -544,34 +546,25 @@ class ConversationManager:
         }
         session.analysis_result = result
 
-        # Enhance with AI
-        enhanced_result = await self._hybrid_ai.enhance_and_validate(calculation_result)
+        # ========================================
+        # GENERATE RICH EXPLANATION WITH CITATIONS
+        # ========================================
+        logger.info("Generating rich explanation with legal citations...")
+        rich_explanation = await self._result_explainer.explain_result(
+            calculation_result=calculation_result,
+            filled_fields=session.filled_fields,
+            decision_path=None  # TODO: Pass actual decision path from logic tree
+        )
 
-        # Build response message
-        total_costs = calculation_result.get("total_costs", 0)
-        cost_range_min = calculation_result.get("cost_range_min", 0)
-        cost_range_max = calculation_result.get("cost_range_max", 0)
-        court_level = calculation_result.get("court_level", "")
-        case_type = calculation_result.get("case_type", "").replace("_", " ").title()
+        # Use rich explanation as the message
+        message = rich_explanation
 
-        message = f"""Based on the information provided, here are the cost calculations:
+        # Append recommendations if available
+        if recommendations:
+            message += "\n\n**RECOMMENDATIONS:**\n"
+            message += "\n".join(f"• {rec}" for rec in recommendations[:3])
 
-**Case Details:**
-- Court: {court_level}
-- Case Type: {case_type}
-- Claim Amount: ${calculation_result.get('claim_amount', 0):,.2f}
-
-**Cost Estimate:**
-- Estimated Costs: ${total_costs:,.2f}
-- Cost Range: ${cost_range_min:,.2f} - ${cost_range_max:,.2f}
-- Basis: {calculation_result.get('calculation_basis', 'N/A')}
-
-**Recommendations:**
-{chr(10).join(f'- {rec}' for rec in recommendations[:3])}
-
-{enhanced_result.enhanced_result.enhanced_explanation if enhanced_result.enhanced_result.enhanced_explanation else ''}
-
-Would you like more details on any aspect of these costs?"""
+        message += "\n\nWould you like more details on any aspect of these costs?"
 
         # Update status to complete
         session.status = ConversationStatus.COMPLETE
@@ -584,7 +577,7 @@ Would you like more details on any aspect of these costs?"""
             completeness_score=1.0,
             next_action="complete",
             result=result,
-            metadata={"enhanced": enhanced_result.is_safe},
+            metadata={"with_legal_explanation": True},
         )
 
     # ============================================
