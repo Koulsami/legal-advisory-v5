@@ -18,6 +18,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies FIRST (better caching)
+# Cache bust: 2025-01-26-anthropic
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
