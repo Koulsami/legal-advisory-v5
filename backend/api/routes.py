@@ -20,6 +20,9 @@ from backend.conversation import ConversationManager
 from backend.hybrid_ai import ClaudeAIService, HybridAIOrchestrator
 from backend.modules.order_21 import Order21Module
 
+# Import v6 routes
+from backend.api.routes_v6 import router_v6
+
 # Setup logging
 log_level = os.getenv("LOG_LEVEL", "INFO")
 setup_logging(level=log_level)
@@ -72,6 +75,10 @@ conversation_manager = ConversationManager(hybrid_ai, analysis_engine, module_re
 logger.info("🚀 Legal Advisory System v5.0 initialized")
 logger.info(f"📊 Registered modules: {module_registry.list_modules()}")
 logger.info(f"🌐 CORS origins: {allowed_origins}")
+
+# Include v6 routes
+app.include_router(router_v6)
+logger.info("✅ v6 routes mounted at /api/v6/*")
 
 
 # ============================================
