@@ -76,6 +76,12 @@ logger.info("🚀 Legal Advisory System v5.0 initialized")
 logger.info(f"📊 Registered modules: {module_registry.list_modules()}")
 logger.info(f"🌐 CORS origins: {allowed_origins}")
 
+# Initialize v6 conversation manager for default endpoints
+from backend.mykraws.system_builder import SystemBuilderV6
+v6_builder = SystemBuilderV6(anthropic_api_key=anthropic_api_key)
+conversation_manager_v6 = v6_builder.build()
+logger.info("✅ v6 conversation manager initialized for default endpoints")
+
 # Include v6 routes
 app.include_router(router_v6)
 logger.info("✅ v6 routes mounted at /api/v6/*")
@@ -178,18 +184,19 @@ async def health():
 @app.get("/debug/session/{session_id}")
 async def debug_session(session_id: str):
     """
-    Debug endpoint - shows complete session state for troubleshooting.
+    Debug endpoint - shows complete v6 session state for troubleshooting.
 
     Shows:
+    - Current phase
     - Filled fields
-    - Missing fields
     - Completeness score
     - Message history
+    - Validation history
     - Module ID
 
     This helps diagnose why extraction or flow is failing.
     """
-    session = conversation_manager.get_session(session_id)
+    session = conversation_manager_v6.get_session(session_id)
 
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -197,20 +204,20 @@ async def debug_session(session_id: str):
     return {
         "session_id": session.session_id,
         "user_id": session.user_id,
-        "status": session.status.value,
+        "current_phase": session.current_phase.value,
         "module_id": session.module_id,
         "filled_fields": session.filled_fields,
-        "missing_fields": session.missing_fields,
         "completeness_score": session.completeness_score,
         "message_count": len(session.messages),
         "messages": [
             {
-                "role": msg.role.value,
-                "content": msg.content,
-                "timestamp": msg.timestamp.isoformat(),
+                "role": msg["role"],
+                "content": msg["content"],
+                "timestamp": msg["timestamp"].isoformat() if hasattr(msg["timestamp"], "isoformat") else str(msg["timestamp"]),
             }
             for msg in session.messages
         ],
+        "validation_history_count": len(session.validation_history),
         "created_at": session.created_at.isoformat(),
         "updated_at": session.updated_at.isoformat(),
     }
@@ -223,17 +230,24 @@ async def debug_session(session_id: str):
 
 @app.post("/sessions", response_model=CreateSessionResponse)
 async def create_session(request: CreateSessionRequest):
-    """Create new conversation session"""
-    session = conversation_manager.create_session(user_id=request.user_id)
+    """Create new conversation session (using v6)"""
+    session = conversation_manager_v6.create_session(user_id=request.user_id)
+
+    # Auto-deliver greeting
+    greeting_response = await conversation_manager_v6.process_message(
+        user_message="",
+        session_id=session.session_id
+    )
+
     return CreateSessionResponse(
-        session_id=session.session_id, status=session.status.value
+        session_id=session.session_id, status="active"
     )
 
 
 @app.get("/sessions/{session_id}", response_model=SessionResponse)
 async def get_session(session_id: str):
-    """Get session information"""
-    session = conversation_manager.get_session(session_id)
+    """Get session information (v6)"""
+    session = conversation_manager_v6.get_session(session_id)
 
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -241,7 +255,7 @@ async def get_session(session_id: str):
     return SessionResponse(
         session_id=session.session_id,
         user_id=session.user_id,
-        status=session.status.value,
+        status="active" if session.current_phase != "complete" else "complete",
         module_id=session.module_id,
         filled_fields=session.filled_fields,
         completeness_score=session.completeness_score,
@@ -251,14 +265,14 @@ async def get_session(session_id: str):
 
 @app.get("/sessions", response_model=List[SessionResponse])
 async def list_sessions(user_id: Optional[str] = None):
-    """List all sessions, optionally filtered by user"""
-    sessions = conversation_manager.list_sessions(user_id=user_id)
+    """List all sessions (v6), optionally filtered by user"""
+    sessions = conversation_manager_v6.list_sessions(user_id=user_id)
 
     return [
         SessionResponse(
             session_id=s.session_id,
             user_id=s.user_id,
-            status=s.status.value,
+            status="active" if s.current_phase != "complete" else "complete",
             module_id=s.module_id,
             filled_fields=s.filled_fields,
             completeness_score=s.completeness_score,
@@ -275,23 +289,27 @@ async def list_sessions(user_id: Optional[str] = None):
 
 @app.post("/messages", response_model=MessageResponse)
 async def send_message(request: MessageRequest):
-    """Send message in conversation"""
+    """Send message in conversation (using v6 conversational AI)"""
     logger.info(f"📨 Message received: session={request.session_id[:8]}, message='{request.message[:50]}...'")
 
-    response = await conversation_manager.process_message(
+    # Use v6 conversation manager
+    response = await conversation_manager_v6.process_message(
         user_message=request.message, session_id=request.session_id
     )
 
-    logger.info(f"💬 Response sent: status={response.status.value}, completeness={response.completeness_score:.0%}")
+    logger.info(f"💬 v6 Response sent: phase={response['phase']}, continue={response['continue_conversation']}")
+
+    # Map v6 response to v5 response format for frontend compatibility
+    session = conversation_manager_v6.get_session(request.session_id)
 
     return MessageResponse(
-        session_id=response.session_id,
-        message=response.message,
-        status=response.status.value,
-        completeness_score=response.completeness_score,
-        next_action=response.next_action,
-        questions=response.questions,
-        result=response.result,
+        session_id=request.session_id,
+        message=response["response"],
+        status="active" if response["continue_conversation"] else "complete",
+        completeness_score=response["metadata"].get("information_completeness", 0.0),
+        next_action=None,
+        questions=[],  # v6 asks one question at a time in the message itself
+        result=response["metadata"].get("calculation_result") if not response["continue_conversation"] else None,
     )
 
 
