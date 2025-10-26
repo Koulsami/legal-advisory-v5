@@ -80,7 +80,7 @@ class GapDetector:
         self, module_id: str, filled_fields: Dict[str, Any]
     ) -> ValidationResult:
         """
-        Validate filled fields against the module's logic tree.
+        Validate filled fields against the module's requirements.
 
         This is called AFTER AI extracts information from user message.
         It checks if we have enough to make a calculation.
@@ -92,10 +92,12 @@ class GapDetector:
         Returns:
             ValidationResult with gaps if incomplete
         """
-        # Get the decision tree for this module
-        root_node = self.tree_framework.get_tree_root(module_id)
+        # Import here to avoid circular dependency
+        from backend.common_services.module_registry import get_global_registry
 
-        if not root_node:
+        registry = get_global_registry()
+        if not registry:
+            # No registry available - can't validate
             return ValidationResult(
                 complete=False,
                 completeness_score=0.0,
@@ -105,124 +107,61 @@ class GapDetector:
                 can_calculate=False,
             )
 
-        # Traverse tree and find gaps
+        # Get the module
+        module = registry.get_module(module_id)
+        if not module:
+            return ValidationResult(
+                complete=False,
+                completeness_score=0.0,
+                gaps=[],
+                current_path=[],
+                next_decision_point=None,
+                can_calculate=False,
+            )
+
+        # Get field requirements
+        field_requirements = module.get_field_requirements()
+
+        # Find gaps - missing required fields
         gaps = []
-        path = []
-        current_node = root_node
+        required_fields = [fr for fr in field_requirements if fr.required]
 
-        while current_node:
-            path.append(current_node.node_id)
+        for field_req in required_fields:
+            field_name = field_req.field_name
 
-            # Check if this is a calculation node (leaf)
-            if current_node.node_type == "CALCULATION":
-                # We've reached a calculation node - we're complete!
-                return ValidationResult(
-                    complete=True,
-                    completeness_score=1.0,
-                    gaps=[],
-                    current_path=path,
-                    next_decision_point=None,
-                    can_calculate=True,
-                )
-
-            # Check if this is a decision node
-            if current_node.node_type == "DECISION":
-                # What field does this decision require?
-                decision_field = self._get_decision_field(current_node)
-
-                if not decision_field:
-                    # No clear decision field - move to first child
-                    if current_node.children:
-                        current_node = current_node.children[0]
-                    else:
-                        break
-                    continue
-
-                # Do we have this field?
-                if decision_field not in filled_fields:
-                    # GAP FOUND!
-                    gap = Gap(
-                        field_name=decision_field,
-                        field_type=self._infer_field_type(decision_field),
-                        description=current_node.question_text or f"Need {decision_field}",
-                        legal_basis=current_node.legal_reference or "Order 21",
-                        priority="required",
-                        context={
-                            "node_id": current_node.node_id,
-                            "already_filled": list(filled_fields.keys()),
-                        },
-                    )
-                    gaps.append(gap)
-
-                    # Calculate completeness score
-                    completeness = len(filled_fields) / (len(filled_fields) + len(gaps))
-
-                    return ValidationResult(
-                        complete=False,
-                        completeness_score=completeness,
-                        gaps=gaps,
-                        current_path=path,
-                        next_decision_point=decision_field,
-                        can_calculate=False,
-                    )
-
-                # We have the field - navigate to appropriate child
-                field_value = filled_fields[decision_field]
-                next_node = self._find_matching_child(current_node, field_value)
-
-                if not next_node:
-                    # No matching child - might be an unexpected value
-                    gap = Gap(
-                        field_name=decision_field,
-                        field_type=self._infer_field_type(decision_field),
-                        description=f"Value '{field_value}' not recognized for {decision_field}",
-                        legal_basis=current_node.legal_reference or "Order 21",
-                        priority="required",
-                        context={
-                            "node_id": current_node.node_id,
-                            "provided_value": field_value,
-                            "expected_values": [
-                                child.condition for child in current_node.children
-                            ],
-                        },
-                    )
-                    gaps.append(gap)
-
-                    return ValidationResult(
-                        complete=False,
-                        completeness_score=0.5,
-                        gaps=gaps,
-                        current_path=path,
-                        next_decision_point=decision_field,
-                        can_calculate=False,
-                    )
-
-                # Move to next node
-                current_node = next_node
-
-            else:
-                # Other node type - move to first child if exists
-                if current_node.children:
-                    current_node = current_node.children[0]
-                else:
-                    break
-
-        # Reached end without finding calculation node
-        return ValidationResult(
-            complete=False,
-            completeness_score=len(filled_fields) / (len(filled_fields) + 1),
-            gaps=gaps or [
-                Gap(
-                    field_name="unknown",
-                    field_type="unknown",
-                    description="Unable to determine next step",
-                    legal_basis="Order 21",
+            # Check if field is filled
+            if field_name not in filled_fields or filled_fields[field_name] is None:
+                gap = Gap(
+                    field_name=field_name,
+                    field_type=field_req.field_type,
+                    description=field_req.description,
+                    legal_basis="Order 21",  # TODO: Get from module metadata
                     priority="required",
+                    context={
+                        "already_filled": list(filled_fields.keys()),
+                    },
                 )
-            ],
-            current_path=path,
-            next_decision_point=None,
-            can_calculate=False,
+                gaps.append(gap)
+
+        # Calculate completeness
+        total_required = len(required_fields)
+        filled_required = total_required - len(gaps)
+        completeness_score = filled_required / total_required if total_required > 0 else 0.0
+
+        # Determine if we can calculate
+        complete = len(gaps) == 0
+        can_calculate = complete
+
+        # Next decision point is first gap
+        next_decision_point = gaps[0].field_name if gaps else None
+
+        return ValidationResult(
+            complete=complete,
+            completeness_score=completeness_score,
+            gaps=gaps,
+            current_path=[module_id],  # Simple path for now
+            next_decision_point=next_decision_point,
+            can_calculate=can_calculate,
         )
 
     def _get_decision_field(self, node: LogicTreeNode) -> Optional[str]:
@@ -327,7 +266,12 @@ class GapDetector:
         Returns:
             List of field names that may be required
         """
-        root_node = self.tree_framework.get_tree_root(module_id)
+        try:
+            tree_nodes = self.tree_framework.get_module_tree(module_id)
+            root_node = tree_nodes[0] if tree_nodes else None
+        except (KeyError, IndexError):
+            root_node = None
+
         if not root_node:
             return []
 

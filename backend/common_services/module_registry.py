@@ -19,6 +19,20 @@ from backend.common_services.logic_tree_framework import LogicTreeFramework
 
 logger = logging.getLogger(__name__)
 
+# Global registry instance (for gap detector access)
+_global_registry = None
+
+
+def get_global_registry():
+    """Get the global module registry instance."""
+    return _global_registry
+
+
+def set_global_registry(registry):
+    """Set the global module registry instance."""
+    global _global_registry
+    _global_registry = registry
+
 
 @dataclass
 class ModuleRegistration:
@@ -86,6 +100,9 @@ class ModuleRegistry:
         # Statistics
         self._registration_count = 0
         self._total_tree_nodes = 0
+
+        # Set as global registry
+        set_global_registry(self)
 
         logger.info("ModuleRegistry initialized")
 

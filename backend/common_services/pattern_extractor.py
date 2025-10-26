@@ -56,9 +56,22 @@ class PatternExtractor:
     # Trial duration patterns
     TRIAL_DAYS_PATTERNS = [
         r'(\d+)\s*[-]?\s*days?\s*(?:contested\s*)?trial',  # 3-day trial, 3 day trial
+        r'trial\s*[,.]?\s*(\d+)\s*days?',  # trial, 3 days or trial 3 days
+        r'contested\s*trial\s*[,.]?\s*(\d+)\s*days?',  # contested trial, 3 days
         r'(\d+)\s*trial\s*days?',  # 3 trial days
-        r'trial\s*(?:of\s*)?(\d+)\s*days?',  # trial of 3 days
+        r'trial\s*(?:of\s*|for\s*)?(\d+)\s*days?',  # trial of 3 days / trial for 3 days
+        r'(\d+)\s*days?\s*(?:of\s*)?(?:contested\s*)?trial',  # 3 days of contested trial
         r'(\d+)\s*days?\s*contested',  # 3 days contested
+    ]
+
+    # ADR refusal patterns
+    ADR_REFUSAL_PATTERNS = [
+        r'\brefused\s*(?:to\s*participate\s*in\s*)?(?:adr|mediation|arbitration)',
+        r'\b(?:adr|mediation|arbitration)\s*(?:was\s*)?refused',
+        r'\brejected\s*(?:adr|mediation|arbitration)',
+        r'\b(?:adr|mediation|arbitration)\s*(?:was\s*)?rejected',
+        r'\bdeclined\s*(?:adr|mediation|arbitration)',
+        r'\brefused\s*(?:mediation|arbitration|adr)',
     ]
 
     def __init__(self):
@@ -103,6 +116,11 @@ class PatternExtractor:
         trial_days = self.extract_trial_days(text_lower)
         if trial_days:
             extracted["trial_days"] = int(trial_days)
+
+        # Extract ADR refusal
+        adr_refused = self.extract_adr_refusal(text_lower)
+        if adr_refused:
+            extracted["adr_refused"] = True
 
         return extracted
 
@@ -204,6 +222,21 @@ class PatternExtractor:
                     continue
         return None
 
+    def extract_adr_refusal(self, text: str) -> bool:
+        """
+        Extract ADR refusal indicator.
+
+        Args:
+            text: Lowercase text
+
+        Returns:
+            True if ADR refusal detected, False otherwise
+        """
+        for pattern in self.ADR_REFUSAL_PATTERNS:
+            if re.search(pattern, text, re.IGNORECASE):
+                return True
+        return False
+
     def extract_field(self, field_name: str, text: str) -> Optional[Any]:
         """
         Extract specific field from text.
@@ -228,5 +261,7 @@ class PatternExtractor:
             return float(amount) if amount else None
         elif field_name == "trial_days":
             return self.extract_trial_days(text_lower)
+        elif field_name == "adr_refused":
+            return self.extract_adr_refusal(text_lower)
 
         return None
