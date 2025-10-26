@@ -18,7 +18,7 @@ from backend.common_services.logging_config import get_logger, log_extraction, l
 from backend.hybrid_ai.hybrid_orchestrator import HybridAIOrchestrator
 from backend.hybrid_ai.hybrid_turn_manager import HybridTurnManager
 from backend.hybrid_ai.natural_question_generator import NaturalQuestionGenerator
-from backend.hybrid_ai.result_explainer import ResultExplainer
+from backend.hybrid_ai.dynamic_result_explainer import DynamicResultExplainer
 
 # Set up logging
 logger = get_logger(__name__)
@@ -65,7 +65,7 @@ class ConversationManager:
         # Initialize hybrid architecture components
         self._gap_detector = GapDetector(module_registry.tree_framework)
         self._question_generator = NaturalQuestionGenerator(hybrid_ai._ai_service)
-        self._result_explainer = ResultExplainer(hybrid_ai._ai_service)
+        self._result_explainer = DynamicResultExplainer(hybrid_ai._ai_service)
         self._hybrid_turn_manager = HybridTurnManager(
             ai_service=hybrid_ai._ai_service,
             gap_detector=self._gap_detector,
@@ -83,7 +83,7 @@ class ConversationManager:
             "completed_sessions": 0,
         }
 
-        logger.info("ConversationManager initialized with HYBRID architecture + ResultExplainer")
+        logger.info("ConversationManager initialized with HYBRID architecture + DynamicResultExplainer")
 
     # ============================================
     # SESSION MANAGEMENT
