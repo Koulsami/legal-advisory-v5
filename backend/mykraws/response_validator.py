@@ -21,6 +21,7 @@ import re
 from typing import Dict, Any, List, Optional, Set
 from dataclasses import dataclass, field
 from datetime import datetime
+from difflib import SequenceMatcher
 
 from backend.common_services.logging_config import get_logger
 from backend.mykraws.conversation_manager_v6 import ValidationLog
@@ -60,6 +61,95 @@ class ValidationResult:
             correction_attempts=self.correction_attempts,
             rules_checked_against=[]  # Will be populated by validator
         )
+
+
+class QuoteAccuracyVerifier:
+    """
+    Verifies that quoted text matches source material.
+
+    Uses fuzzy matching to handle minor variations while detecting
+    significant misquotes or fabricated quotes.
+    """
+
+    def __init__(self, similarity_threshold: float = 0.80):
+        """
+        Initialize verifier.
+
+        Args:
+            similarity_threshold: Minimum similarity for quote to be considered accurate (0.0-1.0)
+        """
+        self.similarity_threshold = similarity_threshold
+
+    def verify_quote(self, quote: str, source_text: str) -> tuple[bool, float]:
+        """
+        Verify if a quote appears in source text.
+
+        Args:
+            quote: The quoted text to verify
+            source_text: The source text where quote should appear
+
+        Returns:
+            Tuple of (is_accurate, similarity_score)
+        """
+        # Normalize both strings
+        quote_norm = self._normalize_text(quote)
+        source_norm = self._normalize_text(source_text)
+
+        # Check if quote is a substring (perfect match)
+        if quote_norm in source_norm:
+            return (True, 1.0)
+
+        # Check if quote appears with minor differences
+        similarity = self._fuzzy_match(quote_norm, source_norm)
+
+        is_accurate = similarity >= self.similarity_threshold
+        return (is_accurate, similarity)
+
+    def _normalize_text(self, text: str) -> str:
+        """Normalize text for comparison"""
+        # Convert to lowercase
+        text = text.lower()
+
+        # Remove extra whitespace
+        text = re.sub(r'\s+', ' ', text)
+
+        # Strip leading/trailing whitespace
+        text = text.strip()
+
+        return text
+
+    def _fuzzy_match(self, quote: str, source: str) -> float:
+        """
+        Calculate fuzzy similarity between quote and source.
+
+        Checks both:
+        1. If quote appears as substring (with some tolerance)
+        2. Sequence matching ratio
+
+        Returns:
+            Similarity score (0.0 to 1.0)
+        """
+        # Try to find quote in source with sliding window
+        quote_len = len(quote)
+        if quote_len == 0:
+            return 0.0
+
+        best_match = 0.0
+
+        # Slide through source text
+        for i in range(len(source) - quote_len + 1):
+            window = source[i:i + quote_len]
+            similarity = SequenceMatcher(None, quote, window).ratio()
+            best_match = max(best_match, similarity)
+
+            # Early exit if we find excellent match
+            if best_match >= 0.95:
+                break
+
+        # Also check overall similarity
+        overall_similarity = SequenceMatcher(None, quote, source).ratio()
+
+        return max(best_match, overall_similarity)
 
 
 class ResponseValidator:
@@ -123,11 +213,13 @@ class ResponseValidator:
             module_registry: Optional access to module registry for dynamic validation
         """
         self.module_registry = module_registry
+        self.quote_verifier = QuoteAccuracyVerifier(similarity_threshold=0.80)
         self._validation_count = 0
         self._failure_count = 0
         self._correction_success_count = 0
 
         logger.info("ResponseValidator initialized - 100% validation coverage enforced")
+        logger.info("  - Quote accuracy verification enabled (threshold: 80%)")
 
     def validate(
         self,
@@ -172,6 +264,10 @@ class ResponseValidator:
         # Check 5: Consistency Check
         consistency_issues = self._check_consistency(ai_response, session)
         issues.extend(consistency_issues)
+
+        # Check 6: Quote Accuracy Verification
+        quote_issues = self._verify_quote_accuracy(ai_response, session)
+        issues.extend(quote_issues)
 
         # Determine if validation passed
         critical_issues = [i for i in issues if i.severity in ["critical", "high"]]
@@ -490,6 +586,109 @@ class ResponseValidator:
 
         # Generic fallback
         return "Could you tell me more about your case so I can calculate the appropriate costs?"
+
+    def _verify_quote_accuracy(self, response: str, session) -> List[ValidationIssue]:
+        """
+        Verify accuracy of any quotes in the response.
+
+        Checks if quoted text actually appears in logic tree nodes with sufficient accuracy.
+
+        Args:
+            response: AI response to check
+            session: Current session with logic tree context
+
+        Returns:
+            List of quote accuracy issues found
+        """
+        issues = []
+
+        # Pattern to match quoted text (both "..." and '...')
+        quote_patterns = [
+            r'"([^"]{20,})"',  # Double quotes, at least 20 chars
+            r"'([^']{20,})'"   # Single quotes, at least 20 chars
+        ]
+
+        quotes_found = []
+        for pattern in quote_patterns:
+            matches = re.findall(pattern, response)
+            quotes_found.extend(matches)
+
+        if not quotes_found:
+            # No significant quotes to verify
+            return issues
+
+        # Get logic tree nodes from module registry
+        if not self.module_registry or not session.module_id:
+            # Can't verify without access to source material
+            return issues
+
+        try:
+            module = self.module_registry.get_module(session.module_id)
+            if not module:
+                return issues
+
+            # Get all logic tree nodes for this module
+            tree_framework = self.module_registry.tree_framework
+            logic_tree = tree_framework.get_module_tree(session.module_id)
+
+            # Build searchable text from all nodes
+            source_texts = []
+            for node in logic_tree:
+                # Collect text from all logical deductions
+                node_texts = []
+
+                for dimension in ['what', 'which', 'if_then', 'modality', 'given', 'why']:
+                    dimension_data = getattr(node, dimension, None)
+                    if dimension_data:
+                        for item in dimension_data:
+                            if isinstance(item, dict) and 'description' in item:
+                                node_texts.append(item['description'])
+                            elif isinstance(item, str):
+                                node_texts.append(item)
+
+                # Combine all node text
+                combined_text = " ".join(node_texts)
+                if combined_text:
+                    source_texts.append({
+                        'node_id': node.node_id,
+                        'citation': node.citation,
+                        'text': combined_text
+                    })
+
+            # Verify each quote against source texts
+            for quote in quotes_found:
+                quote_verified = False
+                best_similarity = 0.0
+
+                for source in source_texts:
+                    is_accurate, similarity = self.quote_verifier.verify_quote(
+                        quote, source['text']
+                    )
+
+                    best_similarity = max(best_similarity, similarity)
+
+                    if is_accurate:
+                        quote_verified = True
+                        logger.debug(f"Quote verified in {source['citation']}: {similarity:.2%} match")
+                        break
+
+                if not quote_verified:
+                    # Quote doesn't match any source with sufficient accuracy
+                    issues.append(ValidationIssue(
+                        issue_type="quote_accuracy",
+                        severity="high",
+                        description=f"Quoted text doesn't match source material (best match: {best_similarity:.0%})",
+                        context=quote[:100] + "..." if len(quote) > 100 else quote,
+                        suggestion="Remove quote or verify against Rules of Court"
+                    ))
+                    logger.warning(f"Potential misquote detected (similarity: {best_similarity:.0%})")
+
+        except Exception as e:
+            logger.error(f"Error during quote verification: {e}")
+            # Don't fail validation if quote verification has issues
+            # This is an enhancement, not a critical check
+
+        return issues
 
     def _normalize_citation(self, citation: str) -> str:
         """

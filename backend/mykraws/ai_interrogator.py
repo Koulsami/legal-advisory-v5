@@ -447,9 +447,18 @@ class AIInterrogator:
 
         prompt = f"""{context.personality_guidelines}
 
+CRITICAL CONSTRAINT RULES (MANDATORY):
+1. Use **ONLY** the Rules of Court provided below - DO NOT use any other knowledge
+2. DO NOT rely on your training data or prior legal knowledge
+3. DO NOT invent or assume any rules not explicitly provided
+4. If the provided rules don't support your explanation, say "I need this information to proceed"
+5. ONLY reference rules that are explicitly listed in the RULES OF COURT CONTEXT section
+6. Every legal claim you make MUST be supported by a cited rule below
+
 CURRENT TASK: Generate ONE natural question to gather the next piece of information.
 
 RULES OF COURT CONTEXT (Singapore):
+These are the ONLY rules you may reference in your response:
 {rules_summary}
 
 INFORMATION GATHERED SO FAR:
@@ -470,16 +479,22 @@ REQUIREMENTS:
 1. Acknowledge the user's previous answer first (if applicable)
 2. Ask about the field in natural language (not "What is the {gap['field_name']}?")
 3. Explain WHY you need this information
-4. Reference the specific Rule of Court that requires it
+4. Reference ONLY the specific Rules of Court provided above
 5. Be warm and friendly (MyKraws personality)
 6. Keep it conversational, not formal
+7. NEVER cite rules not in the RULES OF COURT CONTEXT section
 
 EXAMPLE FORMAT:
 "Thanks for sharing that! To calculate your costs accurately, I need to know about [natural description].
 
-Under [Rule Citation], the [court/judgment type/etc] affects the cost calculation. [Brief explanation of why it matters].
+Under [Rule Citation from above], the [court/judgment type/etc] affects the cost calculation. [Brief explanation based ONLY on rules above].
 
 [Natural question asking for the information]"
+
+VALIDATION CHECKLIST before responding:
+✓ Am I using ONLY the rules provided in RULES OF COURT CONTEXT?
+✓ Have I avoided using any legal knowledge from my training?
+✓ Have I cited specific rules from the list above?
 
 Generate your question now:
 """

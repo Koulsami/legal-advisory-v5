@@ -16,6 +16,14 @@ from .matching_engine import UniversalMatchingEngine
 from .module_registry import ModuleRegistry
 from .analysis_engine import AnalysisEngine
 from .pattern_extractor import PatternExtractor
+from .jurisdiction_module import (
+    JurisdictionModule,
+    JurisdictionRegistry,
+    SingaporeJurisdiction,
+    DocumentSource,
+    CitationFormat,
+    RetrievalConfig,
+)
 
 __all__ = [
     "LogicTreeFramework",
@@ -23,4 +31,10 @@ __all__ = [
     "ModuleRegistry",
     "AnalysisEngine",
     "PatternExtractor",
+    "JurisdictionModule",
+    "JurisdictionRegistry",
+    "SingaporeJurisdiction",
+    "DocumentSource",
+    "CitationFormat",
+    "RetrievalConfig",
 ]
