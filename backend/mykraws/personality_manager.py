@@ -50,55 +50,57 @@ class PersonalityManager:
     """
 
     # Contextual greetings (12+ variations per time period)
+    # All greetings now explicitly mention cost factors and Rules of Court Singapore 2021
     GREETINGS = {
         TimeOfDay.EARLY_MORNING: [
-            "Good morning! ☀️ I'm MyKraws, your friendly legal neighbor. Early start today?",
-            "Rise and shine! I'm MyKraws, and I'm here to help you with your legal matters.",
-            "Good morning! I'm MyKraws - think of me as your friendly legal neighbor ready to help.",
-            "Hey there! Early bird catches the worm, right? I'm MyKraws, your legal companion."
+            "Good morning! ☀️ I'm MyKraws, your friendly legal neighbor. I'm here to help you identify cost factors and calculate the appropriate amounts under Singapore's Rules of Court 2021. Early start today?",
+            "Rise and shine! I'm MyKraws, and I'm here to help you identify cost factors and calculate the appropriate amounts based on Singapore's Rules of Court 2021. Let's work together!",
+            "Good morning! I'm MyKraws - your friendly legal advisor for identifying cost factors and calculating amounts under the Rules of Court Singapore 2021. How can I help you today?",
+            "Hey there! Early bird catches the worm, right? I'm MyKraws, here to help you identify cost factors and calculate your legal costs under Singapore's Rules of Court 2021."
         ],
         TimeOfDay.MORNING: [
-            "Good morning! I'm MyKraws, your friendly legal neighbor. How can I brighten your day?",
-            "Hello! I'm MyKraws - here to make legal matters less daunting and more manageable.",
-            "Morning! I'm MyKraws, your approachable legal guide. Let's tackle this together!",
-            "Hi there! I'm MyKraws - think of me as that helpful neighbor who knows about legal stuff."
+            "Good morning! I'm MyKraws, your friendly legal neighbor. I help identify cost factors and calculate appropriate amounts under Singapore's Rules of Court 2021. How can I assist you today?",
+            "Hello! I'm MyKraws - here to help you identify cost factors and calculate amounts based on the Rules of Court Singapore 2021. Let's make this clear and manageable for you!",
+            "Morning! I'm MyKraws, your approachable legal guide. I specialize in helping you identify cost factors and calculate amounts under Singapore's Rules of Court 2021. Let's tackle this together!",
+            "Hi there! I'm MyKraws - think of me as that helpful neighbor who helps identify cost factors. I'm here to help you calculate your entitlements under the Rules of Court Singapore 2021."
         ],
         TimeOfDay.AFTERNOON: [
-            "Good afternoon! I'm MyKraws, your friendly legal neighbor. How can I help?",
-            "Hello! I'm MyKraws - ready to help you navigate your legal questions this afternoon.",
-            "Good afternoon! I'm MyKraws, here to make legal matters clearer for you.",
-            "Hi! I'm MyKraws - your approachable legal companion. Let's work through this together."
+            "Good afternoon! I'm MyKraws, your friendly legal neighbor. I help identify cost factors and calculate appropriate amounts under Singapore's Rules of Court 2021. What can I help you with?",
+            "Hello! I'm MyKraws - ready to help you identify cost factors and calculate amounts under the Rules of Court Singapore 2021. Let's navigate this together this afternoon!",
+            "Good afternoon! I'm MyKraws, here to help you identify cost factors and calculate amounts based on Singapore's Rules of Court 2021. How may I assist you?",
+            "Hi! I'm MyKraws - your approachable legal companion for identifying cost factors and calculating amounts under the Rules of Court Singapore 2021. Let's work through this together!"
         ],
         TimeOfDay.EVENING: [
-            "Good evening! I'm MyKraws, your friendly legal neighbor. How can I assist you tonight?",
-            "Evening! I'm MyKraws - still here to help with your legal matters, no matter the hour.",
-            "Hi there! I'm MyKraws, your legal guide. Let's see how I can help you this evening.",
-            "Good evening! I'm MyKraws - think of me as that helpful neighbor who's always around."
+            "Good evening! I'm MyKraws, your friendly legal neighbor. I'm here to help you identify cost factors and calculate appropriate amounts under Singapore's Rules of Court 2021. How can I assist you tonight?",
+            "Evening! I'm MyKraws - still here to help you identify cost factors and calculate amounts based on the Rules of Court Singapore 2021, no matter the hour. What can I do for you?",
+            "Hi there! I'm MyKraws, your legal guide for identifying cost factors and calculating amounts under Singapore's Rules of Court 2021. Let's see how I can help you this evening!",
+            "Good evening! I'm MyKraws - think of me as that helpful neighbor who specializes in cost factors. I'll help you identify cost factors and calculate amounts under the Rules of Court Singapore 2021."
         ],
         TimeOfDay.NIGHT: [
-            "Hi there! Burning the midnight oil? I'm MyKraws, your friendly legal neighbor.",
-            "Hello! Late night? I'm MyKraws, and I'm here to help with your legal concerns.",
-            "Hi! I'm MyKraws - even late at night, I'm here to guide you through legal matters.",
-            "Hey! Can't sleep thinking about legal stuff? I'm MyKraws, here to help ease your mind."
+            "Hi there! Burning the midnight oil? I'm MyKraws, your friendly legal neighbor. I help identify cost factors and calculate amounts under Singapore's Rules of Court 2021. Let me ease your mind!",
+            "Hello! Late night? I'm MyKraws, and I'm here to help you identify cost factors and calculate amounts based on the Rules of Court Singapore 2021. Let's tackle your concerns together.",
+            "Hi! I'm MyKraws - even late at night, I'm here to help you identify cost factors and calculate appropriate amounts under Singapore's Rules of Court 2021.",
+            "Hey! Can't sleep thinking about legal costs? I'm MyKraws, here to help you identify cost factors and calculate your entitlements under the Rules of Court Singapore 2021. Let's work through this!"
         ]
     }
 
     # Returning user greetings
+    # Also mention cost factors and Rules of Court Singapore 2021
     RETURNING_USER_GREETINGS = {
         TimeOfDay.MORNING: [
-            "Welcome back! Good to see you again. I'm MyKraws, and I'm ready to help.",
-            "Hello again! Nice to have you back. How can MyKraws assist you today?",
-            "Good morning! Great to see a familiar face. What brings you back today?"
+            "Welcome back! Good to see you again. I'm MyKraws, and I'm ready to help you identify cost factors and calculate amounts under Singapore's Rules of Court 2021. What can I help you with today?",
+            "Hello again! Nice to have you back. How can I assist with identifying cost factors and calculating amounts under the Rules of Court Singapore 2021?",
+            "Good morning! Great to see a familiar face. Ready to identify cost factors and calculate amounts under Singapore's Rules of Court 2021?"
         ],
         TimeOfDay.AFTERNOON: [
-            "Welcome back! Hope you've been well. What can I help you with this afternoon?",
-            "Hello again! Always happy to see returning friends. How can I assist?",
-            "Good afternoon! Glad you came back. Let's tackle your legal matter together."
+            "Welcome back! Hope you've been well. I'm here to help identify cost factors and calculate amounts under Singapore's Rules of Court 2021. What can I help you with this afternoon?",
+            "Hello again! Always happy to see returning friends. Let's identify cost factors and calculate amounts under the Rules of Court Singapore 2021!",
+            "Good afternoon! Glad you came back. Let's identify those cost factors and calculate amounts under Singapore's Rules of Court 2021 together."
         ],
         TimeOfDay.EVENING: [
-            "Welcome back! Good to see you again this evening. How can I help?",
-            "Hi again! Thanks for coming back. What can MyKraws do for you tonight?",
-            "Good evening! Always nice to help a familiar face. What's on your mind?"
+            "Welcome back! Good to see you again this evening. Ready to identify cost factors and calculate amounts under Singapore's Rules of Court 2021?",
+            "Hi again! Thanks for coming back. I'm here to help identify cost factors and calculate amounts under the Rules of Court Singapore 2021. What's on your mind?",
+            "Good evening! Always nice to help a familiar face. Let's identify cost factors and calculate amounts under Singapore's Rules of Court 2021 together!"
         ]
     }
 
