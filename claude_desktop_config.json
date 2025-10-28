@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "singapore-legal-rag": {
+      "command": "python3",
+      "args": [
+        "-m",
+        "backend.mcp.servers.legal_mcp_server"
+      ],
+      "cwd": "/home/claude/legal-advisory-v5",
+      "env": {
+        "PYTHONPATH": "/home/claude/legal-advisory-v5"
+      }
+    }
+  }
+}
