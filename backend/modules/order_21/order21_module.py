@@ -21,6 +21,7 @@ from backend.interfaces import (
     QuestionTemplate,
 )
 from backend.modules.order_21.tree_data import get_all_order21_nodes
+from backend.modules.order_21.case_law_manager import get_case_law_manager
 
 
 class Order21Module(ILegalModule):
@@ -419,6 +420,9 @@ class Order21Module(ILegalModule):
         elif court_level == "Magistrates Court":
             rules_applied.append("ORDER_21_RULE_3_MAGISTRATES_COURT")
 
+        # Get relevant case law
+        case_law = self.get_relevant_case_law(filled_fields, max_cases=2)
+
         return {
             "base_costs": adjusted_costs,
             "total_costs": adjusted_costs,
@@ -436,6 +440,8 @@ class Order21Module(ILegalModule):
             "rules_applied": rules_applied,
             "confidence": "high",  # 100% accurate deterministic calculation
             "timestamp": datetime.utcnow().isoformat(),
+            # Case law
+            "case_law": case_law,
         }
 
     def _calculate_high_court_costs(
@@ -665,3 +671,401 @@ class Order21Module(ILegalModule):
         )
 
         return recommendations
+
+    # ============================================
+    # APPENDIX G: PRACTICE DIRECTIONS COSTS
+    # ============================================
+
+    def calculate_appendix_g(self, filled_fields: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Calculate costs using Appendix G (Practice Directions).
+
+        This method handles costs for:
+        - Part II: Summonses (applications)
+        - Part III: Trials
+        - Part IV: Originating Applications
+        - Part V: Appeals
+
+        Args:
+            filled_fields: Extracted information including source indicator
+
+        Returns:
+            Dictionary with cost calculation results
+
+        Example:
+            >>> result = module.calculate_appendix_g({
+            ...     "application_type": "striking_out_whole",
+            ...     "contested": True
+            ... })
+        """
+        from backend.modules.appendix_g_data import APPENDIX_G_METADATA
+
+        # Determine which Appendix G section to use
+        if "application_type" in filled_fields:
+            return self._calculate_summons_costs(filled_fields)
+        elif "trial_category" in filled_fields:
+            return self._calculate_trial_costs(filled_fields)
+        elif "originating_app_type" in filled_fields:
+            return self._calculate_originating_app_costs(filled_fields)
+        elif "appeal_level" in filled_fields:
+            return self._calculate_appeal_costs(filled_fields)
+        else:
+            # Fallback: return error
+            return {
+                "error": "Unable to determine Appendix G section",
+                "total_costs": 0,
+                "cost_range_min": 0,
+                "cost_range_max": 0,
+                "calculation_basis": "Unknown",
+                "rules_applied": [],
+                "calculation_steps": ["Error: Could not match query to any Appendix G section"],
+                "assumptions": [],
+                "confidence": "none"
+            }
+
+    def _calculate_summons_costs(self, filled_fields: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Calculate costs for summonses (Appendix G Part II).
+
+        Args:
+            filled_fields: Must include "application_type"
+
+        Returns:
+            Dictionary with calculation results
+        """
+        from backend.modules.appendix_g_data import get_summons_cost
+
+        app_type = filled_fields.get("application_type")
+        contested = filled_fields.get("contested", True)  # Default to contested
+        duration_mins = filled_fields.get("duration_minutes")
+
+        # Get cost range
+        cost_range = get_summons_cost(app_type, contested, duration_mins)
+
+        # Use midpoint as the estimate
+        total_costs = cost_range.midpoint()
+
+        # Build calculation steps
+        calculation_steps = [
+            f"1. Identified application type: {app_type.replace('_', ' ')}",
+            f"2. Application is {'contested' if contested else 'uncontested'}",
+        ]
+
+        if duration_mins:
+            calculation_steps.append(f"3. Hearing duration: {duration_mins} minutes")
+
+        calculation_steps.append(
+            f"4. Costs range: ${cost_range.min_cost:,.2f} - ${cost_range.max_cost:,.2f}"
+        )
+        calculation_steps.append(
+            f"5. Using midpoint estimate: ${total_costs:,.2f}"
+        )
+
+        # Determine rule reference
+        if app_type in ["striking_out_whole", "striking_out_partial", "summary_judgment_given", "summary_judgment_dismissed"]:
+            rules_applied = ["Appendix G, Part II.B (Specific Applications)", "Order 21, Rule 2(2) factors apply"]
+        else:
+            rules_applied = ["Appendix G, Part II.B (Specific Applications)", "Practice Directions Para. 138(1)"]
+
+        # Get relevant case law
+        case_law = self.get_relevant_case_law(filled_fields, max_cases=2)
+
+        return {
+            "total_costs": total_costs,
+            "cost_range_min": cost_range.min_cost,
+            "cost_range_max": cost_range.max_cost,
+            "calculation_basis": f"Appendix G Part II.B - {app_type.replace('_', ' ').title()}",
+            "application_type": app_type,
+            "contested": contested,
+            "calculation_steps": calculation_steps,
+            "assumptions": [
+                "Costs are guidelines, court retains discretion",
+                "Court must consider Order 21, Rule 2(2) factors",
+                "Excludes disbursements"
+            ] + (cost_range.notes if cost_range.notes else []),
+            "rules_applied": rules_applied,
+            "confidence": "high",
+            "source": "appendix_g",
+            "timestamp": datetime.now().isoformat(),
+            # Case law
+            "case_law": case_law,
+        }
+
+    def _calculate_trial_costs(self, filled_fields: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Calculate costs for trials (Appendix G Part III).
+
+        Args:
+            filled_fields: Must include "trial_category"
+
+        Returns:
+            Dictionary with calculation results
+        """
+        from backend.modules.appendix_g_data import get_trial_cost
+
+        trial_category = filled_fields.get("trial_category")
+        trial_days = filled_fields.get("trial_days")
+        trial_phase = filled_fields.get("trial_phase")
+        settled = trial_phase == "settled_before_trial" if trial_phase else False
+
+        # Get cost breakdown
+        cost_breakdown = get_trial_cost(trial_category, trial_days, settled)
+
+        # Calculate total
+        if settled:
+            total_costs = (cost_breakdown["total_min"] + cost_breakdown["total_max"]) / 2
+            cost_min = cost_breakdown["total_min"]
+            cost_max = cost_breakdown["total_max"]
+        else:
+            total_costs = (cost_breakdown["total_min"] + cost_breakdown["total_max"]) / 2
+            cost_min = cost_breakdown["total_min"]
+            cost_max = cost_breakdown["total_max"]
+
+        # Build calculation steps
+        calculation_steps = [
+            f"1. Case category: {trial_category.replace('_', ' ').title()}",
+        ]
+
+        if settled:
+            calculation_steps.extend([
+                "2. Matter settled before trial",
+                f"3. Pleadings costs: ${cost_breakdown['pleadings']['min']:,.0f} - ${cost_breakdown['pleadings']['max']:,.0f}",
+                f"4. Production of Documents: ${cost_breakdown['production_of_documents']['min']:,.0f} - ${cost_breakdown['production_of_documents']['max']:,.0f}",
+                f"5. AEICs: ${cost_breakdown['aeiCs']['min']:,.0f} - ${cost_breakdown['aeiCs']['max']:,.0f}",
+                f"6. Total range: ${cost_min:,.0f} - ${cost_max:,.0f}",
+                f"7. Using midpoint: ${total_costs:,.0f}"
+            ])
+        else:
+            days_str = f" ({trial_days} days)" if trial_days else ""
+            calculation_steps.extend([
+                f"2. Pre-trial costs: ${cost_breakdown['pre_trial']['min']:,.0f} - ${cost_breakdown['pre_trial']['max']:,.0f}",
+                f"3. Trial costs{days_str}: ${cost_breakdown['trial']['min']:,.0f} - ${cost_breakdown['trial']['max']:,.0f}",
+                f"4. Post-trial costs: up to ${cost_breakdown['post_trial']['max']:,.0f}",
+                f"5. Total range: ${cost_min:,.0f} - ${cost_max:,.0f}",
+                f"6. Using midpoint: ${total_costs:,.0f}"
+            ])
+
+        return {
+            "total_costs": total_costs,
+            "cost_range_min": cost_min,
+            "cost_range_max": cost_max,
+            "calculation_basis": f"Appendix G Part III - {trial_category.replace('_', ' ').title()}",
+            "trial_category": trial_category,
+            "trial_days": trial_days,
+            "trial_phase": trial_phase or "full_trial",
+            "cost_breakdown": cost_breakdown,
+            "calculation_steps": calculation_steps,
+            "assumptions": [
+                "Costs are guidelines, court retains discretion",
+                "Pre-trial work includes pleadings, production, and AEICs",
+                "Post-trial work excludes enforcement proceedings"
+            ] + (cost_breakdown.get("notes", [])),
+            "rules_applied": ["Appendix G, Part III.A", "Practice Directions Para. 138(1)"],
+            "confidence": "high",
+            "source": "appendix_g",
+            "timestamp": datetime.now().isoformat(),
+            # Case law
+            "case_law": self.get_relevant_case_law(filled_fields, max_cases=2),
+        }
+
+    def _calculate_originating_app_costs(self, filled_fields: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Calculate costs for originating applications (Appendix G Part IV).
+
+        Args:
+            filled_fields: Must include "originating_app_type"
+
+        Returns:
+            Dictionary with calculation results
+        """
+        from backend.modules.appendix_g_data import get_originating_application_cost
+
+        app_type = filled_fields.get("originating_app_type")
+        contested = filled_fields.get("contested", True)
+        trial_days = filled_fields.get("trial_days")  # Some orig apps use days
+
+        # Get cost range
+        cost_range = get_originating_application_cost(app_type, contested, trial_days)
+
+        total_costs = cost_range.midpoint()
+
+        # Build calculation steps
+        calculation_steps = [
+            f"1. Originating application type: {app_type.replace('_', ' ').title()}",
+            f"2. Application is {'contested' if contested else 'uncontested'}",
+        ]
+
+        if trial_days:
+            calculation_steps.append(f"3. Duration: {trial_days} days")
+
+        calculation_steps.extend([
+            f"4. Cost range: ${cost_range.min_cost:,.2f} - ${cost_range.max_cost:,.2f}",
+            f"5. Using midpoint: ${total_costs:,.2f}"
+        ])
+
+        return {
+            "total_costs": total_costs,
+            "cost_range_min": cost_range.min_cost,
+            "cost_range_max": cost_range.max_cost,
+            "calculation_basis": f"Appendix G Part IV - {app_type.replace('_', ' ').title()}",
+            "originating_app_type": app_type,
+            "contested": contested,
+            "calculation_steps": calculation_steps,
+            "assumptions": [
+                "Costs are guidelines, court retains discretion",
+                "Includes pre-hearing and post-hearing work",
+                "Excludes enforcement proceedings"
+            ] + (cost_range.notes if cost_range.notes else []),
+            "rules_applied": ["Appendix G, Part IV", "Practice Directions Para. 138(1)"],
+            "confidence": "high",
+            "source": "appendix_g",
+            "timestamp": datetime.now().isoformat(),
+            # Case law
+            "case_law": self.get_relevant_case_law(filled_fields, max_cases=2),
+        }
+
+    def _calculate_appeal_costs(self, filled_fields: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Calculate costs for appeals (Appendix G Part V).
+
+        Args:
+            filled_fields: Must include "appeal_level"
+
+        Returns:
+            Dictionary with calculation results
+        """
+        from backend.modules.appendix_g_data import get_appeal_cost
+
+        appeal_level = filled_fields.get("appeal_level")
+        appeal_from = filled_fields.get("appeal_from")
+
+        # Get cost range
+        cost_range = get_appeal_cost(appeal_level, appeal_from)
+
+        total_costs = cost_range.midpoint()
+
+        # Build calculation steps
+        calculation_steps = [
+            f"1. Appeal level: {appeal_level.replace('_', ' ').title()}",
+        ]
+
+        if appeal_from:
+            calculation_steps.append(
+                f"2. Appeal from: {appeal_from} {'application' if appeal_from == 'interlocutory' else 'judgment'}"
+            )
+
+        calculation_steps.extend([
+            f"3. Cost range: ${cost_range.min_cost:,.2f} - ${cost_range.max_cost:,.2f}",
+            f"4. Using midpoint: ${total_costs:,.2f}"
+        ])
+
+        # Add special notes for certain appeal levels
+        special_notes = []
+        if appeal_level in ["appellate_division", "court_of_appeal"]:
+            special_notes.append(
+                "Court of Appeal may adjust costs if further appeal granted"
+            )
+
+        return {
+            "total_costs": total_costs,
+            "cost_range_min": cost_range.min_cost,
+            "cost_range_max": cost_range.max_cost,
+            "calculation_basis": f"Appendix G Part V - {appeal_level.replace('_', ' ').title()}",
+            "appeal_level": appeal_level,
+            "appeal_from": appeal_from,
+            "calculation_steps": calculation_steps,
+            "assumptions": [
+                "Costs are guidelines, court retains discretion",
+                "Per appeal/application basis"
+            ] + special_notes + (cost_range.notes if cost_range.notes else []),
+            "rules_applied": ["Appendix G, Part V", "Practice Directions Para. 138(1)"],
+            "confidence": "high",
+            "source": "appendix_g",
+            "timestamp": datetime.now().isoformat(),
+            # Case law
+            "case_law": self.get_relevant_case_law(filled_fields, max_cases=2),
+        }
+
+    # ================================================================================
+    # CASE LAW INTEGRATION
+    # ================================================================================
+
+    def get_relevant_case_law(self, filled_fields: Dict[str, Any],
+                              max_cases: int = 3) -> List[Dict[str, Any]]:
+        """
+        Get relevant case law for a cost calculation scenario.
+
+        Args:
+            filled_fields: Fields extracted from user query
+            max_cases: Maximum number of cases to return
+
+        Returns:
+            List of formatted case law dictionaries
+        """
+        try:
+            case_law_manager = get_case_law_manager()
+
+            # Determine scenario type for matching
+            scenario_type = self._determine_scenario_type(filled_fields)
+
+            # Search for relevant case law
+            matches = case_law_manager.search_by_scenario(
+                scenario_type=scenario_type,
+                filled_fields=filled_fields,
+                max_results=max_cases
+            )
+
+            # Format for output
+            case_law_list = []
+            for match in matches:
+                case_law_list.append(
+                    case_law_manager.format_case_for_display(
+                        match.case,
+                        include_quote=False  # Don't include full quote in result
+                    )
+                )
+
+            return case_law_list
+
+        except Exception as e:
+            # Graceful fallback - don't break calculation if case law fails
+            return []
+
+    def _determine_scenario_type(self, filled_fields: Dict[str, Any]) -> str:
+        """
+        Determine the scenario type for case law matching.
+
+        Args:
+            filled_fields: Fields from user query
+
+        Returns:
+            Scenario type string
+        """
+        # Check source first
+        source = filled_fields.get("source", "order_21")
+
+        if source == "appendix_g":
+            # Appendix G scenarios
+            if "application_type" in filled_fields:
+                return f"application_{filled_fields.get('application_type')}"
+            elif "trial_category" in filled_fields:
+                return f"trial_{filled_fields.get('trial_category')}"
+            elif "appeal_level" in filled_fields:
+                return "appeal"
+            else:
+                return "appendix_g_general"
+        else:
+            # Order 21 scenarios
+            case_type = filled_fields.get("case_type", "default_judgment")
+
+            # Map case types to scenario categories
+            if "trial" in case_type:
+                return "contested_trial"
+            elif "default" in case_type:
+                return "default_judgment"
+            elif "assessment" in case_type:
+                return "assessment"
+            elif "interlocutory" in case_type:
+                return "interlocutory"
+            else:
+                return case_type

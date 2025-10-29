@@ -232,16 +232,23 @@ class ClaudeAIService(IAIService):
         # Construct system message from context if provided
         system_message = context.get("system_message", "")
 
+        # Build API call parameters
+        api_params = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": [{"role": "user", "content": prompt}]
+        }
+
+        # Add system message if provided (must be list format for newer API)
+        if system_message:
+            if isinstance(system_message, str):
+                api_params["system"] = [{"type": "text", "text": system_message}]
+            else:
+                api_params["system"] = system_message
+
         # Make API call
-        message = await self._client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            system=system_message if system_message else None,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
+        message = await self._client.messages.create(**api_params)
 
         # Extract response content
         content = message.content[0].text if message.content else ""
