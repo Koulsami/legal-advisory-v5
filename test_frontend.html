@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal Advisory System - Local Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .status.connected {
+            background: #10b981;
+            color: white;
+        }
+
+        .status.disconnected {
+            background: #ef4444;
+            color: white;
+        }
+
+        .status.checking {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .panel h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .input-section {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        input[type="text"], textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e5e7eb;
+            border-radius: 5px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .examples {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+
+        .examples h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .example-btn {
+            background: white;
+            border: 1px solid #d1d5db;
+            padding: 8px 12px;
+            margin: 5px 5px 5px 0;
+            border-radius: 5px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .example-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .result-container {
+            background: #f9fafb;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 10px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .result-section {
+            margin-bottom: 20px;
+        }
+
+        .result-section h3 {
+            color: #667eea;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .result-item {
+            background: white;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            border-left: 3px solid #667eea;
+        }
+
+        .result-label {
+            font-weight: 600;
+            color: #333;
+            margin-right: 5px;
+        }
+
+        .result-value {
+            color: #666;
+        }
+
+        .cost-highlight {
+            font-size: 24px;
+            font-weight: 700;
+            color: #10b981;
+        }
+
+        .error {
+            background: #fee2e2;
+            border-left: 3px solid #ef4444;
+            padding: 10px;
+            border-radius: 5px;
+            color: #991b1b;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        pre {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            background: #f3f4f6;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚖️ Legal Advisory System - Local Test</h1>
+            <p class="subtitle">Test backend API endpoints locally</p>
+            <div style="margin-top: 10px;">
+                <strong>API URL:</strong>
+                <input type="text" id="apiUrl" value="http://localhost:8000" style="width: 300px; display: inline-block;">
+                <span id="statusIndicator" class="status checking">Checking...</span>
+                <button onclick="checkHealth()" style="margin-left: 10px; padding: 5px 10px;">Refresh</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Left Panel: Input -->
+            <div class="panel">
+                <h2>🔍 Query Input</h2>
+
+                <div class="input-section">
+                    <label>Natural Language Query:</label>
+                    <textarea id="query" placeholder="Enter your legal cost query here...">Calculate costs for a High Court default judgment with $50,000</textarea>
+                </div>
+
+                <button class="btn" onclick="calculateCosts()">
+                    Calculate Costs
+                </button>
+
+                <div class="examples">
+                    <h3>📝 Example Queries:</h3>
+                    <button class="example-btn" onclick="setQuery('Calculate costs for a High Court default judgment with $50,000')">
+                        High Court - $50k
+                    </button>
+                    <button class="example-btn" onclick="setQuery('District Court summary judgment for $80,000')">
+                        District Court - $80k
+                    </button>
+                    <button class="example-btn" onclick="setQuery('Magistrates Court default judgment for $15,000')">
+                        Magistrates - $15k
+                    </button>
+                    <button class="example-btn" onclick="setQuery('High Court contested trial of 3 days with claim of $100,000')">
+                        Trial - $100k
+                    </button>
+                </div>
+
+                <div class="input-section" style="margin-top: 20px;">
+                    <h3 style="font-size: 14px; margin-bottom: 10px;">Or use structured input:</h3>
+                    <label>Court Level:</label>
+                    <select id="courtLevel">
+                        <option value="High Court">High Court</option>
+                        <option value="District Court">District Court</option>
+                        <option value="Magistrates Court">Magistrates Court</option>
+                    </select>
+                </div>
+
+                <div class="input-section">
+                    <label>Claim Amount ($):</label>
+                    <input type="text" id="claimAmount" placeholder="50000">
+                </div>
+
+                <button class="btn" onclick="calculateStructured()" style="margin-top: 10px;">
+                    Calculate from Fields
+                </button>
+            </div>
+
+            <!-- Right Panel: Results -->
+            <div class="panel">
+                <h2>📊 Results</h2>
+
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('formatted')">Formatted</button>
+                    <button class="tab" onclick="switchTab('json')">JSON Response</button>
+                    <button class="tab" onclick="switchTab('debug')">Debug Info</button>
+                </div>
+
+                <div id="resultsArea">
+                    <div class="result-container" style="text-align: center; color: #999;">
+                        <p style="margin-top: 40px;">Results will appear here after calculation</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let lastRequest = null;
+        let lastResponse = null;
+        let lastError = null;
+
+        // Check API health on load
+        window.onload = function() {
+            checkHealth();
+        }
+
+        function getApiUrl() {
+            return document.getElementById('apiUrl').value.trim();
+        }
+
+        async function checkHealth() {
+            const apiUrl = getApiUrl();
+            const statusEl = document.getElementById('statusIndicator');
+
+            statusEl.textContent = 'Checking...';
+            statusEl.className = 'status checking';
+
+            try {
+                const response = await fetch(`${apiUrl}/health`);
+                if (response.ok) {
+                    statusEl.textContent = 'Connected';
+                    statusEl.className = 'status connected';
+                } else {
+                    statusEl.textContent = 'Error';
+                    statusEl.className = 'status disconnected';
+                }
+            } catch (err) {
+                statusEl.textContent = 'Disconnected';
+                statusEl.className = 'status disconnected';
+                console.error('Health check failed:', err);
+            }
+        }
+
+        function setQuery(text) {
+            document.getElementById('query').value = text;
+        }
+
+        async function calculateCosts() {
+            const query = document.getElementById('query').value.trim();
+            if (!query) {
+                alert('Please enter a query');
+                return;
+            }
+
+            const apiUrl = getApiUrl();
+            showLoading();
+
+            try {
+                lastRequest = { query };
+
+                const response = await fetch(`${apiUrl}/calculate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(lastRequest)
+                });
+
+                const data = await response.json();
+                lastResponse = data;
+                lastError = null;
+
+                if (response.ok) {
+                    displayResults(data);
+                } else {
+                    displayError(data.detail || 'Calculation failed');
+                    lastError = data;
+                }
+            } catch (err) {
+                displayError(err.message);
+                lastError = { error: err.message };
+                console.error('Calculation error:', err);
+            }
+        }
+
+        async function calculateStructured() {
+            const courtLevel = document.getElementById('courtLevel').value;
+            const claimAmount = document.getElementById('claimAmount').value;
+
+            const query = `Calculate costs for a ${courtLevel} default judgment with $${claimAmount}`;
+            document.getElementById('query').value = query;
+
+            await calculateCosts();
+        }
+
+        function showLoading() {
+            document.getElementById('resultsArea').innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Calculating costs...</p>
+                </div>
+            `;
+        }
+
+        function displayResults(data) {
+            const formatted = `
+                <div class="tab-content active" id="formatted">
+                    <div class="result-container">
+                        <div class="result-section">
+                            <h3>💰 Cost Calculation</h3>
+                            <div class="result-item">
+                                <div class="result-label">Total Costs:</div>
+                                <div class="cost-highlight">$${data.total_costs.toLocaleString()}</div>
+                            </div>
+                            <div class="result-item">
+                                <span class="result-label">Cost Range:</span>
+                                <span class="result-value">$${data.cost_range_min.toLocaleString()} - $${data.cost_range_max.toLocaleString()}</span>
+                            </div>
+                        </div>
+
+                        <div class="result-section">
+                            <h3>⚖️ Case Details</h3>
+                            <div class="result-item">
+                                <span class="result-label">Court Level:</span>
+                                <span class="result-value">${data.court_level}</span>
+                            </div>
+                            <div class="result-item">
+                                <span class="result-label">Claim Amount:</span>
+                                <span class="result-value">$${data.claim_amount.toLocaleString()}</span>
+                            </div>
+                            <div class="result-item">
+                                <span class="result-label">Case Type:</span>
+                                <span class="result-value">${data.case_type.replace(/_/g, ' ')}</span>
+                            </div>
+                        </div>
+
+                        <div class="result-section">
+                            <h3>📜 Calculation Basis</h3>
+                            <div class="result-item">
+                                <span class="result-value">${data.calculation_basis}</span>
+                            </div>
+                        </div>
+
+                        <div class="result-section">
+                            <h3>🔍 Calculation Steps</h3>
+                            ${data.calculation_steps.map((step, i) => `
+                                <div class="result-item">
+                                    <span class="result-value">${step}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div class="result-section">
+                            <h3>⚠️ Assumptions</h3>
+                            ${data.assumptions.map(a => `
+                                <div class="result-item">
+                                    <span class="result-value">• ${a}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div class="result-section">
+                            <h3>📚 Rules Applied</h3>
+                            ${data.rules_applied.map(r => `
+                                <div class="result-item">
+                                    <span class="result-value">• ${r}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div class="result-section">
+                            <h3>✅ Confidence</h3>
+                            <div class="result-item">
+                                <span class="result-value">${data.confidence}</span>
+                            </div>
+                        </div>
+
+                        ${data.extracted_info ? `
+                            <div class="result-section">
+                                <h3>🔎 Extracted Information</h3>
+                                <div class="result-item">
+                                    <pre>${JSON.stringify(data.extracted_info, null, 2)}</pre>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <div class="tab-content" id="json">
+                    <div class="result-container">
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="debug">
+                    <div class="result-container">
+                        <h3>Request:</h3>
+                        <pre>${JSON.stringify(lastRequest, null, 2)}</pre>
+
+                        <h3 style="margin-top: 20px;">Response:</h3>
+                        <pre>${JSON.stringify(lastResponse, null, 2)}</pre>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('resultsArea').innerHTML = formatted;
+        }
+
+        function displayError(errorMsg) {
+            document.getElementById('resultsArea').innerHTML = `
+                <div class="tab-content active" id="formatted">
+                    <div class="result-container">
+                        <div class="error">
+                            <strong>Error:</strong> ${errorMsg}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="json">
+                    <div class="result-container">
+                        <pre>${JSON.stringify(lastError, null, 2)}</pre>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="debug">
+                    <div class="result-container">
+                        <h3>Request:</h3>
+                        <pre>${JSON.stringify(lastRequest, null, 2)}</pre>
+
+                        <h3 style="margin-top: 20px;">Error:</h3>
+                        <pre>${JSON.stringify(lastError, null, 2)}</pre>
+                    </div>
+                </div>
+            `;
+        }
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabName).classList.add('active');
+        }
+    </script>
+</body>
+</html>
