@@ -45,12 +45,12 @@ def setup_logging(level: str = "INFO", use_colors: bool = True) -> None:
 
     Args:
         level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        use_colors: Whether to use colored output (disable for log files)
+        use_colors: Whether to use colored output (disable for log files and MCP)
     """
     log_level = getattr(logging, level.upper(), logging.INFO)
 
-    # Create console handler
-    console_handler = logging.StreamHandler(sys.stdout)
+    # Create console handler - MUST use stderr for MCP servers (stdout is for JSON-RPC only)
+    console_handler = logging.StreamHandler(sys.stderr)
     console_handler.setLevel(log_level)
 
     # Set formatter
@@ -116,4 +116,7 @@ def log_ai_interaction(logger: logging.Logger, prompt_type: str, response_summar
 
 
 # Initialize default logging
-setup_logging(level="INFO")
+# Disable colors by default (especially important for MCP servers)
+import os
+use_colors = os.getenv("LOG_COLORS", "false").lower() == "true"
+setup_logging(level="INFO", use_colors=use_colors)
