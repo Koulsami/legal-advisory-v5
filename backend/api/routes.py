@@ -433,29 +433,37 @@ async def direct_calculate(request: DirectCalculationRequest):
                 detail="Could not extract claim amount from query. Please specify an amount (e.g., '$50,000')"
             )
 
-        # Call Order 21 module directly
-        calculation_result = order21_module.calculate(
-            court_level=court_level,
-            case_type=case_type,
-            claim_amount=float(claim_amount),
-            trial_days=extracted.get("trial_days"),
-            complexity_level=extracted.get("complexity_level", "moderate")
-        )
+        # Call Order 21 module directly (pass fields as dictionary)
+        filled_fields = {
+            "court_level": court_level,
+            "case_type": case_type,
+            "claim_amount": float(claim_amount),
+        }
 
-        logger.info(f"Calculation result: Total=${calculation_result.total_costs}")
+        # Add optional fields if present
+        if extracted.get("trial_days"):
+            filled_fields["trial_days"] = extracted.get("trial_days")
+        if extracted.get("complexity_level"):
+            filled_fields["complexity_level"] = extracted.get("complexity_level")
+        else:
+            filled_fields["complexity_level"] = "moderate"
+
+        calculation_result = order21_module.calculate(filled_fields)
+
+        logger.info(f"Calculation result: Total=${calculation_result.get('total_costs', 0)}")
 
         return DirectCalculationResponse(
-            total_costs=calculation_result.total_costs,
-            cost_range_min=calculation_result.cost_range_min,
-            cost_range_max=calculation_result.cost_range_max,
-            calculation_basis=calculation_result.calculation_basis,
-            court_level=calculation_result.court_level,
-            claim_amount=calculation_result.claim_amount,
-            case_type=calculation_result.case_type,
-            calculation_steps=calculation_result.calculation_steps,
-            assumptions=calculation_result.assumptions,
-            rules_applied=calculation_result.rules_applied,
-            confidence=calculation_result.confidence,
+            total_costs=calculation_result.get("total_costs", 0),
+            cost_range_min=calculation_result.get("cost_range_min", 0),
+            cost_range_max=calculation_result.get("cost_range_max", 0),
+            calculation_basis=calculation_result.get("calculation_basis", ""),
+            court_level=calculation_result.get("court_level", court_level),
+            claim_amount=calculation_result.get("claim_amount", claim_amount),
+            case_type=case_type,
+            calculation_steps=calculation_result.get("calculation_steps", []),
+            assumptions=calculation_result.get("assumptions", []),
+            rules_applied=calculation_result.get("rules_applied", []),
+            confidence=calculation_result.get("confidence", "high"),
             extracted_info=extracted
         )
 
