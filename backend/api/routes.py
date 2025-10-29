@@ -376,3 +376,91 @@ async def get_module_info(module_id: str):
             for fr in field_requirements
         ],
     }
+
+
+# ============================================
+# DIRECT CALCULATION ENDPOINT (like MCP demo)
+# ============================================
+
+
+class DirectCalculationRequest(BaseModel):
+    """Request for direct Order 21 calculation"""
+    query: str
+
+
+class DirectCalculationResponse(BaseModel):
+    """Response for direct calculation"""
+    total_costs: float
+    cost_range_min: float
+    cost_range_max: float
+    calculation_basis: str
+    court_level: str
+    claim_amount: float
+    case_type: str
+    calculation_steps: List[str]
+    assumptions: List[str]
+    rules_applied: List[str]
+    confidence: str
+    extracted_info: Dict[str, Any]
+
+
+@app.post("/calculate", response_model=DirectCalculationResponse)
+async def direct_calculate(request: DirectCalculationRequest):
+    """
+    Direct Order 21 cost calculation (bypasses conversational flow).
+
+    Works like MCP demo - immediate results from query.
+    Example: "Calculate costs for a High Court default judgment with $50,000"
+    """
+    try:
+        logger.info(f"Direct calculation request: {request.query}")
+
+        # Extract information from query
+        from backend.common_services.pattern_extractor import PatternExtractor
+        extractor = PatternExtractor()
+        extracted = extractor.extract_all(request.query, context={})
+
+        logger.info(f"Extracted fields: {extracted}")
+
+        # Get required fields for Order 21 calculation
+        court_level = extracted.get("court_level", "High Court")
+        case_type = extracted.get("case_type", "default_judgment_liquidated")
+        claim_amount = extracted.get("claim_amount")
+
+        if not claim_amount:
+            raise HTTPException(
+                status_code=400,
+                detail="Could not extract claim amount from query. Please specify an amount (e.g., '$50,000')"
+            )
+
+        # Call Order 21 module directly
+        calculation_result = order21_module.calculate(
+            court_level=court_level,
+            case_type=case_type,
+            claim_amount=float(claim_amount),
+            trial_days=extracted.get("trial_days"),
+            complexity_level=extracted.get("complexity_level", "moderate")
+        )
+
+        logger.info(f"Calculation result: Total=${calculation_result.total_costs}")
+
+        return DirectCalculationResponse(
+            total_costs=calculation_result.total_costs,
+            cost_range_min=calculation_result.cost_range_min,
+            cost_range_max=calculation_result.cost_range_max,
+            calculation_basis=calculation_result.calculation_basis,
+            court_level=calculation_result.court_level,
+            claim_amount=calculation_result.claim_amount,
+            case_type=calculation_result.case_type,
+            calculation_steps=calculation_result.calculation_steps,
+            assumptions=calculation_result.assumptions,
+            rules_applied=calculation_result.rules_applied,
+            confidence=calculation_result.confidence,
+            extracted_info=extracted
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Direct calculation error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Calculation failed: {str(e)}")

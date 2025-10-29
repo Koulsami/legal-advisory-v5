@@ -32,8 +32,12 @@ function App() {
       const response = await fetch(`${API_URL}/health`)
       if (response.ok) {
         setApiStatus('connected')
-        // Auto-create session on successful connection
-        createSession()
+        setError(null)
+        // Show welcome message
+        setMessages([{
+          role: 'system',
+          content: 'Welcome to the Legal Advisory System! Enter your case details to calculate costs under Singapore Rules of Court Order 21.'
+        }])
       } else {
         setApiStatus('error')
         setError('API is not responding. Please check backend deployment.')
@@ -68,7 +72,7 @@ function App() {
 
   const sendMessage = async (e) => {
     e.preventDefault()
-    if (!inputMessage.trim() || !sessionId || loading) return
+    if (!inputMessage.trim() || loading) return  // Removed sessionId check for direct calculation
 
     const userMessage = inputMessage.trim()
     setInputMessage('')
@@ -79,34 +83,68 @@ function App() {
     setMessages(prev => [...prev, { role: 'user', content: userMessage }])
 
     try {
-      const response = await fetch(`${API_URL}/messages`, {
+      // Use DIRECT CALCULATION endpoint (like MCP demo)
+      const response = await fetch(`${API_URL}/calculate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          session_id: sessionId,
-          message: userMessage
+          query: userMessage
         })
       })
 
-      if (!response.ok) throw new Error('Failed to send message')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || 'Failed to calculate costs')
+      }
 
       const data = await response.json()
+
+      // Format the calculation result into a nice message
+      const formattedMessage = `
+**Cost Calculation Result**
+
+💰 **Total Costs:** $${data.total_costs.toLocaleString()}
+📊 **Cost Range:** $${data.cost_range_min.toLocaleString()} - $${data.cost_range_max.toLocaleString()}
+
+⚖️ **Court Level:** ${data.court_level}
+💵 **Claim Amount:** $${data.claim_amount.toLocaleString()}
+📋 **Case Type:** ${data.case_type.replace(/_/g, ' ')}
+
+📜 **Calculation Basis:**
+${data.calculation_basis}
+
+🔍 **Calculation Steps:**
+${data.calculation_steps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
+
+⚠️ **Assumptions:**
+${data.assumptions.map(a => `• ${a}`).join('\n')}
+
+📚 **Rules Applied:**
+${data.rules_applied.map(r => `• ${r}`).join('\n')}
+
+✅ **Confidence:** ${data.confidence}
+      `.trim()
 
       // Add assistant response
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: data.message,
-        result: data.result,
-        questions: data.questions,
-        status: data.status,
-        completeness: data.completeness_score
+        content: formattedMessage,
+        result: {
+          calculation: {
+            total_costs: data.total_costs,
+            cost_range_min: data.cost_range_min,
+            cost_range_max: data.cost_range_max,
+            citation: data.calculation_basis,
+            breakdown: data.calculation_steps
+          }
+        }
       }])
 
     } catch (err) {
-      setError('Failed to send message: ' + err.message)
+      setError('Calculation failed: ' + err.message)
       setMessages(prev => [...prev, {
         role: 'error',
-        content: 'Sorry, there was an error processing your message.'
+        content: `Sorry, I couldn't calculate costs. ${err.message}\n\nPlease make sure your query includes:\n• Court level (High Court, District Court, Magistrates Court)\n• Case type (default judgment, summary judgment, etc.)\n• Claim amount (e.g., $50,000)`
       }])
     } finally {
       setLoading(false)
@@ -232,16 +270,16 @@ function App() {
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder={sessionId ? "Describe your case..." : "Connecting..."}
-              disabled={!sessionId || loading}
+              placeholder="Describe your case (e.g., High Court default judgment for $50,000)..."
+              disabled={loading}
               className="message-input"
             />
             <button
               type="submit"
-              disabled={!sessionId || loading || !inputMessage.trim()}
+              disabled={loading || !inputMessage.trim()}
               className="send-button"
             >
-              {loading ? '...' : 'Send'}
+              {loading ? '...' : 'Calculate'}
             </button>
           </form>
 
