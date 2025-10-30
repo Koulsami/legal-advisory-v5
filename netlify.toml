@@ -1,0 +1,26 @@
+# Netlify Configuration for Legal Advisory System v5.0
+# This file tells Netlify to deploy the simple frontend
+
+[build]
+  # Use the simple frontend directory
+  base = "frontend-simple"
+
+  # No build command needed - it's a static HTML file
+  command = ""
+
+  # Publish the frontend-simple directory as-is
+  publish = "."
+
+# Redirect all routes to index.html for SPA behavior
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
