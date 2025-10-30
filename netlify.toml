@@ -2,14 +2,14 @@
 # This file tells Netlify to deploy the simple frontend
 
 [build]
-  # Use the simple frontend directory
+  # Use the simple frontend directory as base
   base = "frontend-simple"
 
   # No build command needed - it's a static HTML file
   command = ""
 
-  # Publish the frontend-simple directory contents
-  publish = "frontend-simple"
+  # Publish the current directory (relative to base)
+  publish = "."
 
 # Redirect all routes to index.html for SPA behavior
 [[redirects]]
