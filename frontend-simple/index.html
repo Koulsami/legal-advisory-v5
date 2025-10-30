@@ -422,7 +422,7 @@
             try {
                 lastRequest = { query };
 
-                const response = await fetch(`${apiUrl}/calculate`, {
+                const response = await fetch(`${apiUrl}/chat`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -435,7 +435,7 @@
                 lastError = null;
 
                 if (response.ok) {
-                    displayResults(data);
+                    displayChatResponse(data);
                 } else {
                     displayError(data.detail || 'Calculation failed');
                     lastError = data;
@@ -563,6 +563,56 @@
 
                         <h3 style="margin-top: 20px;">Response:</h3>
                         <pre>${JSON.stringify(lastResponse, null, 2)}</pre>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('resultsArea').innerHTML = formatted;
+        }
+
+        function displayChatResponse(data) {
+            // Convert markdown-like formatting to HTML
+            let message = data.message || '';
+
+            // Convert markdown headers (##) to HTML
+            message = message.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            message = message.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+
+            // Convert bold (**text**)
+            message = message.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+            // Convert bullet points
+            message = message.replace(/^- (.+)$/gm, '<li>$1</li>');
+            message = message.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+
+            // Convert line breaks
+            message = message.replace(/\n\n/g, '</p><p>');
+            message = '<p>' + message + '</p>';
+
+            const formatted = `
+                <div class="tab-content active" id="chat">
+                    <div class="result-container" style="max-width: 900px;">
+                        <div class="conversation-response" style="line-height: 1.8; font-size: 16px;">
+                            ${message}
+                        </div>
+
+                        ${data.calculation_data ? `
+                            <div class="result-section" style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #eee;">
+                                <h3>📊 Detailed Breakdown</h3>
+                                <div class="result-item">
+                                    <div class="result-label">Total Costs:</div>
+                                    <div class="cost-highlight">$${data.calculation_data.total_costs.toLocaleString()}</div>
+                                </div>
+                                <div class="result-item">
+                                    <span class="result-label">Cost Range:</span>
+                                    <span class="result-value">$${data.calculation_data.cost_range_min.toLocaleString()} - $${data.calculation_data.cost_range_max.toLocaleString()}</span>
+                                </div>
+                                <div class="result-item">
+                                    <span class="result-label">Confidence:</span>
+                                    <span class="result-value">${data.calculation_data.confidence}</span>
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
             `;
