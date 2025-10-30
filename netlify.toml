@@ -8,8 +8,8 @@
   # No build command needed - it's a static HTML file
   command = ""
 
-  # Publish the frontend-simple directory as-is
-  publish = "."
+  # Publish the frontend-simple directory contents
+  publish = "frontend-simple"
 
 # Redirect all routes to index.html for SPA behavior
 [[redirects]]
