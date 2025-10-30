@@ -41,34 +41,10 @@
             font-size: 14px;
         }
 
-        .status {
-            display: inline-block;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-left: 10px;
-        }
-
-        .status.connected {
-            background: #10b981;
-            color: white;
-        }
-
-        .status.disconnected {
-            background: #ef4444;
-            color: white;
-        }
-
-        .status.checking {
-            background: #f59e0b;
-            color: white;
-        }
 
         .main-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
         }
 
         .panel {
@@ -250,34 +226,6 @@
             line-height: 1.5;
         }
 
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .tab {
-            padding: 8px 16px;
-            background: #f3f4f6;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .tab.active {
-            background: #667eea;
-            color: white;
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
 
         @media (max-width: 768px) {
             .main-content {
@@ -300,17 +248,12 @@
                     Right now, I'm a <strong>specialist in Order 21 (Legal Costs)</strong>. Think of me as your personal costs calculator with a law degree and a good memory.
                     Go ahead, test my knowledge! Ask me anything about legal costs in Singapore. 💪
                 </p>
-                <div style="margin-top: 15px;">
-                    <strong>API URL:</strong>
-                    <input type="text" id="apiUrl" value="https://legal-advisory-api-production.up.railway.app" style="width: 300px; display: inline-block;">
-                    <span id="statusIndicator" class="status checking">Checking...</span>
-                    <button onclick="checkHealth()" style="margin-left: 10px; padding: 5px 10px;">Refresh</button>
-                </div>
+                <!-- Hidden API URL field -->
+                <input type="hidden" id="apiUrl" value="https://legal-advisory-api-production.up.railway.app">
             </div>
         </div>
 
         <div class="main-content">
-            <!-- Left Panel: Input -->
             <div class="panel">
                 <h2>💬 Ask Your Legal Question</h2>
 
@@ -339,39 +282,10 @@
                     </button>
                 </div>
 
-                <div class="input-section" style="margin-top: 20px;">
-                    <h3 style="font-size: 14px; margin-bottom: 10px;">Or use structured input:</h3>
-                    <label>Court Level:</label>
-                    <select id="courtLevel">
-                        <option value="High Court">High Court</option>
-                        <option value="District Court">District Court</option>
-                        <option value="Magistrates Court">Magistrates Court</option>
-                    </select>
-                </div>
-
-                <div class="input-section">
-                    <label>Claim Amount ($):</label>
-                    <input type="text" id="claimAmount" placeholder="50000">
-                </div>
-
-                <button class="btn" onclick="calculateStructured()" style="margin-top: 10px;">
-                    Calculate from Fields
-                </button>
-            </div>
-
-            <!-- Right Panel: Results -->
-            <div class="panel">
-                <h2>📊 Results</h2>
-
-                <div class="tabs">
-                    <button class="tab active" onclick="switchTab('formatted')">Formatted</button>
-                    <button class="tab" onclick="switchTab('json')">JSON Response</button>
-                    <button class="tab" onclick="switchTab('debug')">Debug Info</button>
-                </div>
-
-                <div id="resultsArea">
+                <!-- Results Area -->
+                <div id="resultsArea" style="margin-top: 30px;">
                     <div class="result-container" style="text-align: center; color: #999;">
-                        <p style="margin-top: 40px;">Results will appear here after calculation</p>
+                        <p style="margin-top: 40px;">💭 Your answer will appear here...</p>
                     </div>
                 </div>
             </div>
@@ -383,36 +297,8 @@
         let lastResponse = null;
         let lastError = null;
 
-        // Check API health on load
-        window.onload = function() {
-            checkHealth();
-        }
-
         function getApiUrl() {
             return document.getElementById('apiUrl').value.trim();
-        }
-
-        async function checkHealth() {
-            const apiUrl = getApiUrl();
-            const statusEl = document.getElementById('statusIndicator');
-
-            statusEl.textContent = 'Checking...';
-            statusEl.className = 'status checking';
-
-            try {
-                const response = await fetch(`${apiUrl}/health`);
-                if (response.ok) {
-                    statusEl.textContent = 'Connected';
-                    statusEl.className = 'status connected';
-                } else {
-                    statusEl.textContent = 'Error';
-                    statusEl.className = 'status disconnected';
-                }
-            } catch (err) {
-                statusEl.textContent = 'Disconnected';
-                statusEl.className = 'status disconnected';
-                console.error('Health check failed:', err);
-            }
         }
 
         function setQuery(text) {
@@ -457,15 +343,6 @@
             }
         }
 
-        async function calculateStructured() {
-            const courtLevel = document.getElementById('courtLevel').value;
-            const claimAmount = document.getElementById('claimAmount').value;
-
-            const query = `Calculate costs for a ${courtLevel} default judgment with $${claimAmount}`;
-            document.getElementById('query').value = query;
-
-            await calculateCosts();
-        }
 
         function showLoading() {
             document.getElementById('resultsArea').innerHTML = `
@@ -476,109 +353,6 @@
             `;
         }
 
-        function displayResults(data) {
-            const formatted = `
-                <div class="tab-content active" id="formatted">
-                    <div class="result-container">
-                        <div class="result-section">
-                            <h3>💰 Cost Calculation</h3>
-                            <div class="result-item">
-                                <div class="result-label">Total Costs:</div>
-                                <div class="cost-highlight">$${data.total_costs.toLocaleString()}</div>
-                            </div>
-                            <div class="result-item">
-                                <span class="result-label">Cost Range:</span>
-                                <span class="result-value">$${data.cost_range_min.toLocaleString()} - $${data.cost_range_max.toLocaleString()}</span>
-                            </div>
-                        </div>
-
-                        <div class="result-section">
-                            <h3>⚖️ Case Details</h3>
-                            <div class="result-item">
-                                <span class="result-label">Court Level:</span>
-                                <span class="result-value">${data.court_level}</span>
-                            </div>
-                            <div class="result-item">
-                                <span class="result-label">Claim Amount:</span>
-                                <span class="result-value">$${data.claim_amount.toLocaleString()}</span>
-                            </div>
-                            <div class="result-item">
-                                <span class="result-label">Case Type:</span>
-                                <span class="result-value">${data.case_type.replace(/_/g, ' ')}</span>
-                            </div>
-                        </div>
-
-                        <div class="result-section">
-                            <h3>📜 Calculation Basis</h3>
-                            <div class="result-item">
-                                <span class="result-value">${data.calculation_basis}</span>
-                            </div>
-                        </div>
-
-                        <div class="result-section">
-                            <h3>🔍 Calculation Steps</h3>
-                            ${data.calculation_steps.map((step, i) => `
-                                <div class="result-item">
-                                    <span class="result-value">${step}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-
-                        <div class="result-section">
-                            <h3>⚠️ Assumptions</h3>
-                            ${data.assumptions.map(a => `
-                                <div class="result-item">
-                                    <span class="result-value">• ${a}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-
-                        <div class="result-section">
-                            <h3>📚 Rules Applied</h3>
-                            ${data.rules_applied.map(r => `
-                                <div class="result-item">
-                                    <span class="result-value">• ${r}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-
-                        <div class="result-section">
-                            <h3>✅ Confidence</h3>
-                            <div class="result-item">
-                                <span class="result-value">${data.confidence}</span>
-                            </div>
-                        </div>
-
-                        ${data.extracted_info ? `
-                            <div class="result-section">
-                                <h3>🔎 Extracted Information</h3>
-                                <div class="result-item">
-                                    <pre>${JSON.stringify(data.extracted_info, null, 2)}</pre>
-                                </div>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-
-                <div class="tab-content" id="json">
-                    <div class="result-container">
-                        <pre>${JSON.stringify(data, null, 2)}</pre>
-                    </div>
-                </div>
-
-                <div class="tab-content" id="debug">
-                    <div class="result-container">
-                        <h3>Request:</h3>
-                        <pre>${JSON.stringify(lastRequest, null, 2)}</pre>
-
-                        <h3 style="margin-top: 20px;">Response:</h3>
-                        <pre>${JSON.stringify(lastResponse, null, 2)}</pre>
-                    </div>
-                </div>
-            `;
-
-            document.getElementById('resultsArea').innerHTML = formatted;
-        }
 
         function displayChatResponse(data) {
             // Convert markdown-like formatting to HTML
@@ -632,44 +406,12 @@
 
         function displayError(errorMsg) {
             document.getElementById('resultsArea').innerHTML = `
-                <div class="tab-content active" id="formatted">
-                    <div class="result-container">
-                        <div class="error">
-                            <strong>Error:</strong> ${errorMsg}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tab-content" id="json">
-                    <div class="result-container">
-                        <pre>${JSON.stringify(lastError, null, 2)}</pre>
-                    </div>
-                </div>
-
-                <div class="tab-content" id="debug">
-                    <div class="result-container">
-                        <h3>Request:</h3>
-                        <pre>${JSON.stringify(lastRequest, null, 2)}</pre>
-
-                        <h3 style="margin-top: 20px;">Error:</h3>
-                        <pre>${JSON.stringify(lastError, null, 2)}</pre>
+                <div class="result-container">
+                    <div class="error">
+                        <strong>⚠️ Oops!</strong> ${errorMsg}
                     </div>
                 </div>
             `;
-        }
-
-        function switchTab(tabName) {
-            // Update tab buttons
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            event.target.classList.add('active');
-
-            // Update tab content
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            document.getElementById(tabName).classList.add('active');
         }
     </script>
 </body>
