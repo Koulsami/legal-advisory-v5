@@ -33,11 +33,8 @@ function App() {
       if (response.ok) {
         setApiStatus('connected')
         setError(null)
-        // Show welcome message
-        setMessages([{
-          role: 'system',
-          content: 'Welcome to the Legal Advisory System! Enter your case details to calculate costs under Singapore Rules of Court Order 21.'
-        }])
+        // Automatically create v6 session and get greeting from MyKraws
+        createV6Session()
       } else {
         setApiStatus('error')
         setError('API is not responding. Please check backend deployment.')
@@ -48,21 +45,25 @@ function App() {
     }
   }
 
-  const createSession = async () => {
+  const createV6Session = async () => {
     try {
-      const response = await fetch(`${API_URL}/sessions`, {
+      const response = await fetch(`${API_URL}/api/v6/session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: `user_${Date.now()}` })
       })
 
-      if (!response.ok) throw new Error('Failed to create session')
+      if (!response.ok) throw new Error('Failed to create v6 session')
 
       const data = await response.json()
       setSessionId(data.session_id)
+
+      // Display MyKraws greeting
       setMessages([{
-        role: 'system',
-        content: 'Session created. How can I help you with legal cost calculations today?'
+        role: 'assistant',
+        content: data.greeting,
+        phase: data.phase,
+        metadata: data.metadata
       }])
       setError(null)
     } catch (err) {
@@ -72,7 +73,7 @@ function App() {
 
   const sendMessage = async (e) => {
     e.preventDefault()
-    if (!inputMessage.trim() || loading) return  // Removed sessionId check for direct calculation
+    if (!inputMessage.trim() || loading || !sessionId) return
 
     const userMessage = inputMessage.trim()
     setInputMessage('')
@@ -83,68 +84,37 @@ function App() {
     setMessages(prev => [...prev, { role: 'user', content: userMessage }])
 
     try {
-      // Use DIRECT CALCULATION endpoint (like MCP demo)
-      const response = await fetch(`${API_URL}/calculate`, {
+      // Use v6 conversational API endpoint
+      const response = await fetch(`${API_URL}/api/v6/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query: userMessage
+          session_id: sessionId,
+          message: userMessage
         })
       })
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.detail || 'Failed to calculate costs')
+        throw new Error(errorData.detail || 'Failed to process message')
       }
 
       const data = await response.json()
 
-      // Format the calculation result into a nice message
-      const formattedMessage = `
-**Cost Calculation Result**
-
-💰 **Total Costs:** $${data.total_costs.toLocaleString()}
-📊 **Cost Range:** $${data.cost_range_min.toLocaleString()} - $${data.cost_range_max.toLocaleString()}
-
-⚖️ **Court Level:** ${data.court_level}
-💵 **Claim Amount:** $${data.claim_amount.toLocaleString()}
-📋 **Case Type:** ${data.case_type.replace(/_/g, ' ')}
-
-📜 **Calculation Basis:**
-${data.calculation_basis}
-
-🔍 **Calculation Steps:**
-${data.calculation_steps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
-
-⚠️ **Assumptions:**
-${data.assumptions.map(a => `• ${a}`).join('\n')}
-
-📚 **Rules Applied:**
-${data.rules_applied.map(r => `• ${r}`).join('\n')}
-
-✅ **Confidence:** ${data.confidence}
-      `.trim()
-
-      // Add assistant response
+      // Add assistant response with phase information
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: formattedMessage,
-        result: {
-          calculation: {
-            total_costs: data.total_costs,
-            cost_range_min: data.cost_range_min,
-            cost_range_max: data.cost_range_max,
-            citation: data.calculation_basis,
-            breakdown: data.calculation_steps
-          }
-        }
+        content: data.response,
+        phase: data.phase,
+        continue_conversation: data.continue_conversation,
+        metadata: data.metadata
       }])
 
     } catch (err) {
-      setError('Calculation failed: ' + err.message)
+      setError('Message failed: ' + err.message)
       setMessages(prev => [...prev, {
         role: 'error',
-        content: `Sorry, I couldn't calculate costs. ${err.message}\n\nPlease make sure your query includes:\n• Court level (High Court, District Court, Magistrates Court)\n• Case type (default judgment, summary judgment, etc.)\n• Claim amount (e.g., $50,000)`
+        content: `Sorry, I encountered an error: ${err.message}`
       }])
     } finally {
       setLoading(false)
@@ -155,7 +125,7 @@ ${data.rules_applied.map(r => `• ${r}`).join('\n')}
     setSessionId(null)
     setMessages([])
     setError(null)
-    createSession()
+    createV6Session()
   }
 
   return (
@@ -191,11 +161,24 @@ ${data.rules_applied.map(r => `• ${r}`).join('\n')}
             {messages.map((msg, index) => (
               <div key={index} className={`message message-${msg.role}`}>
                 {msg.role === 'user' && <div className="message-label">You</div>}
-                {msg.role === 'assistant' && <div className="message-label">Legal Advisor</div>}
+                {msg.role === 'assistant' && (
+                  <div className="message-label">
+                    MyKraws
+                    {msg.phase && <span className="phase-badge">Phase {msg.phase.replace('phase_', '')}</span>}
+                  </div>
+                )}
                 {msg.role === 'system' && <div className="message-label">System</div>}
 
                 <div className="message-content">
-                  <p>{msg.content}</p>
+                  {/* Display thought process if available in metadata */}
+                  {msg.metadata && msg.metadata.thought_process && (
+                    <div className="thought-process">
+                      <strong>💭 Thought process:</strong> {msg.metadata.thought_process}
+                    </div>
+                  )}
+
+                  {/* Main response content - preserving formatting */}
+                  <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
 
                   {msg.result && msg.result.calculation && (
                     <div className="calculation-result">
@@ -270,16 +253,16 @@ ${data.rules_applied.map(r => `• ${r}`).join('\n')}
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="Describe your case (e.g., High Court default judgment for $50,000)..."
-              disabled={loading}
+              placeholder="Type your message..."
+              disabled={loading || !sessionId}
               className="message-input"
             />
             <button
               type="submit"
-              disabled={loading || !inputMessage.trim()}
+              disabled={loading || !inputMessage.trim() || !sessionId}
               className="send-button"
             >
-              {loading ? '...' : 'Calculate'}
+              {loading ? '...' : 'Send'}
             </button>
           </form>
 
