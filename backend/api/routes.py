@@ -496,6 +496,69 @@ async def direct_calculate(request: DirectCalculationRequest):
         raise HTTPException(status_code=500, detail=f"Calculation failed: {str(e)}")
 
 
+def _is_legal_advice_query(query: str, extracted: Dict[str, Any]) -> bool:
+    """
+    Determine if a query is asking for legal advice vs cost calculation.
+
+    Legal advice queries ask about:
+    - Consequences, implications, effects
+    - What happens if...
+    - Legal principles, requirements
+    - Procedures, strategies
+
+    Returns True if query is advice-seeking, False if calculation-seeking.
+    """
+    query_lower = query.lower()
+
+    # Keywords that indicate advice-seeking
+    advice_keywords = [
+        "what happens",
+        "consequences",
+        "implications",
+        "what if",
+        "should i",
+        "can i",
+        "must i",
+        "do i need",
+        "what are the effects",
+        "what will happen",
+        "advice",
+        "guidance",
+        "help me understand",
+        "explain",
+        "what does it mean",
+        "requirements for",
+        "procedure for",
+        "how do i",
+        "strategy",
+        "options"
+    ]
+
+    # Check if query contains advice keywords
+    for keyword in advice_keywords:
+        if keyword in query_lower:
+            return True
+
+    # If query mentions specific legal topics without numbers, likely advice
+    has_legal_topic = any(topic in query_lower for topic in [
+        "security for costs",
+        "stay of proceedings",
+        "discovery",
+        "interrogatories",
+        "summary judgment application",
+        "striking out",
+        "unless order"
+    ])
+
+    has_amount = extracted.get("claim_amount") is not None
+
+    # Legal topic without amount suggests advice query
+    if has_legal_topic and not has_amount:
+        return True
+
+    return False
+
+
 class ChatRequest(BaseModel):
     """Request for conversational chat (like Claude Desktop)"""
     query: str
@@ -526,95 +589,113 @@ async def chat(request: ChatRequest):
 
         logger.info(f"Extracted fields: {extracted}")
 
-        # Determine source: Appendix G or Order 21
+        # Determine if this is a legal advice query or a calculation query
+        is_advice_query = _is_legal_advice_query(request.query, extracted)
+
+        # Check if we can perform a calculation
+        can_calculate = extracted.get("claim_amount") is not None or extracted.get("source") == "appendix_g"
+
+        calculation_result = None
+        court_level = None
+        case_type = None
+        claim_amount = None
         source = extracted.get("source", "order_21")
 
-        if source == "appendix_g":
-            # Use Appendix G calculations
-            logger.info("Routing chat to Appendix G (Practice Directions)")
-            calculation_result = order21_module.calculate_appendix_g(extracted)
-            court_level = "N/A"  # Appendix G doesn't always specify court
-            case_type = "Practice Directions"
-            claim_amount = 0  # May not be relevant for Appendix G
-        else:
-            # Use Order 21 calculations (original)
-            logger.info("Routing chat to Order 21 (Rules of Court)")
-
-            # Get required fields for Order 21 calculation
-            court_level = extracted.get("court_level", "High Court")
-            case_type = extracted.get("case_type", "default_judgment_liquidated")
-            claim_amount = extracted.get("claim_amount")
-
-            if not claim_amount:
-                return ChatResponse(
-                    message="I need more information to calculate the costs. Please specify the claim amount (e.g., '$50,000').",
-                    calculation_data=None
-                )
-
-            # Call Order 21 module directly
-            filled_fields = {
-                "court_level": court_level,
-                "case_type": case_type,
-                "claim_amount": float(claim_amount),
-            }
-
-            if extracted.get("trial_days"):
-                filled_fields["trial_days"] = extracted.get("trial_days")
-            if extracted.get("complexity_level"):
-                filled_fields["complexity_level"] = extracted.get("complexity_level")
+        # Only attempt calculation if we have enough information
+        if can_calculate:
+            if source == "appendix_g":
+                # Use Appendix G calculations
+                logger.info("Routing chat to Appendix G (Practice Directions)")
+                calculation_result = order21_module.calculate_appendix_g(extracted)
+                court_level = "N/A"  # Appendix G doesn't always specify court
+                case_type = "Practice Directions"
+                claim_amount = 0  # May not be relevant for Appendix G
             else:
-                filled_fields["complexity_level"] = "moderate"
+                # Use Order 21 calculations (original)
+                logger.info("Routing chat to Order 21 (Rules of Court)")
 
-            calculation_result = order21_module.calculate(filled_fields)
+                # Get required fields for Order 21 calculation
+                court_level = extracted.get("court_level", "High Court")
+                case_type = extracted.get("case_type", "default_judgment_liquidated")
+                claim_amount = extracted.get("claim_amount")
 
-        logger.info(f"Calculation result: Total=${calculation_result.get('total_costs', 0)}")
+                if claim_amount:
+                    # Call Order 21 module directly
+                    filled_fields = {
+                        "court_level": court_level,
+                        "case_type": case_type,
+                        "claim_amount": float(claim_amount),
+                    }
+
+                    if extracted.get("trial_days"):
+                        filled_fields["trial_days"] = extracted.get("trial_days")
+                    if extracted.get("complexity_level"):
+                        filled_fields["complexity_level"] = extracted.get("complexity_level")
+                    else:
+                        filled_fields["complexity_level"] = "moderate"
+
+                    calculation_result = order21_module.calculate(filled_fields)
+
+        # If no calculation possible but query seems calculation-related, ask for more info
+        if not can_calculate and not is_advice_query:
+            return ChatResponse(
+                message="I need more information to calculate the costs. Please specify the claim amount (e.g., '$50,000').",
+                calculation_data=None
+            )
+
+        # Log calculation result if we have one
+        if calculation_result:
+            logger.info(f"Calculation result: Total=${calculation_result.get('total_costs', 0)}")
+        else:
+            logger.info("No calculation performed - providing legal advice only")
 
         # Use Claude AI to generate natural, conversational response
         try:
             from backend.interfaces.data_structures import AIRequest, AIServiceType
             import json
 
-            # Prepare calculation data for Claude
-            calc_summary = {
-                "total_costs": calculation_result.get("total_costs", 0),
-                "cost_range": f"${calculation_result.get('cost_range_min', 0):,.0f} - ${calculation_result.get('cost_range_max', 0):,.0f}",
-                "source": source,
-                "calculation_basis": calculation_result.get("calculation_basis", ""),
-                "calculation_steps": calculation_result.get("calculation_steps", []),
-                "rules_applied": calculation_result.get("rules_applied", []),
-                "assumptions": calculation_result.get("assumptions", []),
-                "confidence": calculation_result.get("confidence", "high")
-            }
+            # Prepare context for Claude
+            if calculation_result:
+                # We have a calculation - format it for AI
+                calc_summary = {
+                    "total_costs": calculation_result.get("total_costs", 0),
+                    "cost_range": f"${calculation_result.get('cost_range_min', 0):,.0f} - ${calculation_result.get('cost_range_max', 0):,.0f}",
+                    "source": source,
+                    "calculation_basis": calculation_result.get("calculation_basis", ""),
+                    "calculation_steps": calculation_result.get("calculation_steps", []),
+                    "rules_applied": calculation_result.get("rules_applied", []),
+                    "assumptions": calculation_result.get("assumptions", []),
+                    "confidence": calculation_result.get("confidence", "high")
+                }
 
-            # Add source-specific fields
-            if source == "order_21":
-                calc_summary["court_level"] = court_level
-                calc_summary["claim_amount"] = f"${claim_amount:,.0f}"
-                calc_summary["case_type"] = case_type.replace('_', ' ')
-            else:
-                # Appendix G - add relevant extracted fields
-                if "application_type" in extracted:
-                    calc_summary["application_type"] = extracted["application_type"].replace('_', ' ')
-                if "trial_category" in extracted:
-                    calc_summary["trial_category"] = extracted["trial_category"].replace('_', ' ')
-                if "appeal_level" in extracted:
-                    calc_summary["appeal_level"] = extracted["appeal_level"].replace('_', ' ')
+                # Add source-specific fields
+                if source == "order_21" and claim_amount:
+                    calc_summary["court_level"] = court_level
+                    calc_summary["claim_amount"] = f"${claim_amount:,.0f}"
+                    calc_summary["case_type"] = case_type.replace('_', ' ') if case_type else ""
+                else:
+                    # Appendix G - add relevant extracted fields
+                    if "application_type" in extracted:
+                        calc_summary["application_type"] = extracted["application_type"].replace('_', ' ')
+                    if "trial_category" in extracted:
+                        calc_summary["trial_category"] = extracted["trial_category"].replace('_', ' ')
+                    if "appeal_level" in extracted:
+                        calc_summary["appeal_level"] = extracted["appeal_level"].replace('_', ' ')
 
-            # Create a prompt for Claude to format naturally
-            source_description = "Singapore Rules of Court 2021, Order 21" if source == "order_21" else "Singapore Practice Directions (Appendix G)"
+                source_description = "Singapore Rules of Court 2021, Order 21" if source == "order_21" else "Singapore Practice Directions (Appendix G)"
 
-            # Extract case law from calculation result
-            case_law_context = ""
-            if calculation_result.get("case_law"):
-                case_law_list = calculation_result["case_law"]
-                if case_law_list:
-                    case_law_context = "\n\n**Relevant Case Law:**\n"
-                    for i, case in enumerate(case_law_list, 1):
-                        case_law_context += f"\n{i}. **{case.get('short_name')}** {case.get('citation')}\n"
-                        case_law_context += f"   - *Principle:* {case.get('principle')}\n"
-                        case_law_context += f"   - *Authority Statement:* {case.get('authority_statement')}\n"
+                # Extract case law from calculation result
+                case_law_context = ""
+                if calculation_result.get("case_law"):
+                    case_law_list = calculation_result["case_law"]
+                    if case_law_list:
+                        case_law_context = "\n\n**Relevant Case Law:**\n"
+                        for i, case in enumerate(case_law_list, 1):
+                            case_law_context += f"\n{i}. **{case.get('short_name')}** {case.get('citation')}\n"
+                            case_law_context += f"   - *Principle:* {case.get('principle')}\n"
+                            case_law_context += f"   - *Authority Statement:* {case.get('authority_statement')}\n"
 
-            prompt = f"""You are a legal advisory AI assistant helping with Singapore legal cost calculations.
+                prompt = f"""You are a legal advisory AI assistant helping with Singapore legal cost calculations.
 
 The user asked: "{request.query}"
 
@@ -641,6 +722,50 @@ Please present this information in a natural, conversational way similar to how 
 
 Use markdown formatting for structure (headers, bold text, etc.). Be friendly and professional. Make it feel like a conversation, not a data dump.
 When citing case law, use proper legal citation format and explain how it supports the cost calculation."""
+
+            else:
+                # No calculation - provide legal advice
+                # Try to get relevant case law based on extracted info
+                case_law_context = ""
+                try:
+                    from backend.modules.order_21.case_law_manager import get_case_law_manager
+                    manager = get_case_law_manager()
+
+                    # Search for relevant case law
+                    matches = manager.search(request.query, max_results=3)
+                    if matches:
+                        case_law_context = "\n\n**Relevant Case Law:**\n"
+                        for i, match in enumerate(matches, 1):
+                            case = match.case
+                            case_law_context += f"\n{i}. **{case.short_name}** {case.citation}\n"
+                            case_law_context += f"   - *Provision:* {case.provision}\n"
+                            case_law_context += f"   - *Principle:* {case.principle}\n"
+                            case_law_context += f"   - *Quote:* \"{case.verbatim_quote[:200]}...\" (at {case.paragraph_ref})\n"
+                except Exception as e:
+                    logger.warning(f"Could not retrieve case law for advice query: {e}")
+
+                prompt = f"""You are a legal advisory AI assistant specializing in Singapore legal costs and procedure.
+
+The user asked: "{request.query}"
+
+This is a legal advice question about cost implications and procedures. Please provide guidance on:
+
+1. The legal principles involved (cite specific provisions of Order 21 or relevant Practice Directions)
+2. The likely cost consequences in this situation
+3. Procedural requirements they should be aware of
+4. Strategic considerations they should think about
+5. Any relevant case law that applies (if provided below)
+
+{case_law_context}
+
+**IMPORTANT:**
+- Explain the legal principles clearly and professionally
+- If case law is provided, cite it naturally using proper format: "In [Case Name] [Citation], the court held that..."
+- Provide practical guidance they can act on
+- Mention that they should consult with a lawyer for specific advice on their case
+- Use markdown formatting for clarity
+
+Be helpful, professional, and conversational. This is legal guidance, not a calculation."""
 
             # Generate response using Claude AI
             ai_request = AIRequest(
