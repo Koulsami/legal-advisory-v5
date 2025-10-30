@@ -1,0 +1,7 @@
+# Legal Advisory System - Simple Frontend
+# Netlify Configuration
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
