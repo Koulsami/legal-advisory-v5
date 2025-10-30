@@ -991,39 +991,62 @@ class Order21Module(ILegalModule):
     # ================================================================================
 
     def get_relevant_case_law(self, filled_fields: Dict[str, Any],
-                              max_cases: int = 3) -> List[Dict[str, Any]]:
+                              max_cases: int = 3,
+                              matched_nodes: List = None) -> List[Dict[str, Any]]:
         """
         Get relevant case law for a cost calculation scenario.
+
+        First checks if matched nodes have explicit case_law_references,
+        then falls back to scenario-based search.
 
         Args:
             filled_fields: Fields extracted from user query
             max_cases: Maximum number of cases to return
+            matched_nodes: Optional list of matched LogicTreeNodes
 
         Returns:
             List of formatted case law dictionaries
         """
         try:
             case_law_manager = get_case_law_manager()
-
-            # Determine scenario type for matching
-            scenario_type = self._determine_scenario_type(filled_fields)
-
-            # Search for relevant case law
-            matches = case_law_manager.search_by_scenario(
-                scenario_type=scenario_type,
-                filled_fields=filled_fields,
-                max_results=max_cases
-            )
-
-            # Format for output
             case_law_list = []
-            for match in matches:
-                case_law_list.append(
-                    case_law_manager.format_case_for_display(
-                        match.case,
-                        include_quote=False  # Don't include full quote in result
-                    )
+            case_ids_added = set()
+
+            # PRIORITY 1: Check if any matched nodes have explicit case law references
+            if matched_nodes:
+                for node in matched_nodes:
+                    if hasattr(node, 'case_law_references') and node.case_law_references:
+                        for case_id in node.case_law_references:
+                            if case_id not in case_ids_added and len(case_law_list) < max_cases:
+                                # Get case from database by ID
+                                case = case_law_manager._get_case_by_id(case_id)
+                                if case:
+                                    case_law_list.append(
+                                        case_law_manager.format_case_for_display(
+                                            case,
+                                            include_quote=False
+                                        )
+                                    )
+                                    case_ids_added.add(case_id)
+
+            # PRIORITY 2: If we still need more cases, use scenario-based search
+            if len(case_law_list) < max_cases:
+                scenario_type = self._determine_scenario_type(filled_fields)
+                matches = case_law_manager.search_by_scenario(
+                    scenario_type=scenario_type,
+                    filled_fields=filled_fields,
+                    max_results=max_cases - len(case_law_list)
                 )
+
+                for match in matches:
+                    if match.case.case_id not in case_ids_added:
+                        case_law_list.append(
+                            case_law_manager.format_case_for_display(
+                                match.case,
+                                include_quote=False
+                            )
+                        )
+                        case_ids_added.add(match.case.case_id)
 
             return case_law_list
 

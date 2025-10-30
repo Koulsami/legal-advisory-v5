@@ -77,6 +77,9 @@ class LogicTreeNode:
     source_type: str = "rule"
     effective_date: Optional[str] = None
 
+    # Case Law References
+    case_law_references: List[str] = field(default_factory=list)
+
     # Relationships
     parent_nodes: List[str] = field(default_factory=list)
     child_nodes: List[str] = field(default_factory=list)

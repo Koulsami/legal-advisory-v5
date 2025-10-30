@@ -473,11 +473,26 @@ def get_appendix1_scenario_nodes():
 
 def get_all_order21_nodes():
     """
-    Get all pre-built Order 21 logic tree nodes.
+    Get all pre-built Order 21 logic tree nodes with case law references.
+
+    Enhanced nodes (with case law references) are added as additional nodes
+    providing more specific sub-rule interpretations.
 
     Returns:
-        List of 38 LogicTreeNode objects (29 rules + 9 scenarios)
+        List of LogicTreeNode objects (base rules + scenarios + enhanced nodes)
+        Enhanced nodes contain case_law_references field for specific sub-rules
     """
+    # Get base nodes
     rules = get_order21_rule_nodes()
     scenarios = get_appendix1_scenario_nodes()
-    return rules + scenarios
+    all_nodes = rules + scenarios
+
+    # Add enhanced nodes (specific sub-rules with case law references)
+    try:
+        from backend.modules.order_21.tree_data_enhanced import get_enhanced_order21_nodes
+        enhanced_nodes = get_enhanced_order21_nodes()
+        all_nodes.extend(enhanced_nodes)
+    except ImportError:
+        pass  # Enhanced nodes not available, continue with base nodes only
+
+    return all_nodes
