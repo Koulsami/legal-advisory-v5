@@ -31,6 +31,27 @@
             margin-bottom: 20px;
         }
 
+        .header-flex {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .header-image {
+            flex-shrink: 0;
+        }
+
+        .header-text {
+            flex: 1;
+        }
+
+        .mykraws-img {
+            width: 250px;
+            height: auto;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+
         h1 {
             color: #667eea;
             margin-bottom: 5px;
@@ -231,17 +252,62 @@
             .main-content {
                 grid-template-columns: 1fr;
             }
+
+            .header-flex {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .header-image {
+                width: 100%;
+                display: flex;
+                justify-content: center;
+            }
+
+            .mykraws-img {
+                width: 200px;
+                max-width: 90%;
+            }
+
+            .header-text {
+                width: 100%;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .subtitle {
+                font-size: 14px !important;
+            }
+
+            .container {
+                padding: 10px;
+            }
+
+            .header {
+                padding: 15px;
+            }
+
+            .panel {
+                padding: 15px;
+            }
+
+            .example-btn {
+                font-size: 11px;
+                padding: 6px 10px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header" style="display: flex; align-items: center; gap: 30px;">
-            <div style="flex-shrink: 0;">
-                <img src="MyKraws.jpg" alt="MyKraws AI Legal Advisor" style="width: 250px; height: auto; border-radius: 15px; box-shadow: 0 8px 16px rgba(0,0,0,0.2);">
+        <div class="header header-flex">
+            <div class="header-image">
+                <img src="MyKraws.jpg" alt="MyKraws AI Legal Assistant" class="mykraws-img">
             </div>
-            <div style="flex: 1;">
-                <h1>⚖️ MyKraws - Your AI Legal Advisor</h1>
+            <div class="header-text">
+                <h1>⚖️ MyKraws - Your AI Legal Assistant</h1>
                 <p class="subtitle" style="font-size: 16px; margin-top: 10px; line-height: 1.6;">
                     Hey there! 👋 I'm <strong>MyKraws</strong>, your friendly neighborhood AI legal assistant who <em>actually knows what they're talking about</em>.
                     No hallucinations here – just solid legal advice backed by Singapore's Rules of Court 2021.<br><br>
