@@ -289,9 +289,14 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>⚖️ Legal Advisory System v5.0</h1>
-            <p class="subtitle">Singapore Rules of Court - Cost Calculator with Case Law</p>
-            <div style="margin-top: 10px;">
+            <h1>⚖️ MyKraws - Your AI Legal Advisor</h1>
+            <p class="subtitle" style="font-size: 16px; margin-top: 10px; line-height: 1.6;">
+                Hey there! 👋 I'm <strong>MyKraws</strong>, your friendly neighborhood AI legal assistant who <em>actually knows what they're talking about</em>.
+                No hallucinations here – just solid legal advice backed by Singapore's Rules of Court 2021.<br><br>
+                Right now, I'm a <strong>specialist in Order 21 (Legal Costs)</strong>. Think of me as your personal costs calculator with a law degree and a good memory.
+                Go ahead, test my knowledge! Ask me anything about legal costs in Singapore. 💪
+            </p>
+            <div style="margin-top: 15px;">
                 <strong>API URL:</strong>
                 <input type="text" id="apiUrl" value="https://legal-advisory-api-production.up.railway.app" style="width: 300px; display: inline-block;">
                 <span id="statusIndicator" class="status checking">Checking...</span>
@@ -302,30 +307,30 @@
         <div class="main-content">
             <!-- Left Panel: Input -->
             <div class="panel">
-                <h2>🔍 Query Input</h2>
+                <h2>💬 Ask Your Legal Question</h2>
 
                 <div class="input-section">
-                    <label>Natural Language Query:</label>
-                    <textarea id="query" placeholder="Enter your legal cost query here...">Calculate costs for a High Court default judgment with $50,000</textarea>
+                    <label>What would you like to know about legal costs?</label>
+                    <textarea id="query" placeholder="Ask me anything about legal costs under Order 21... Try: 'I need costs for opposing a stay application, the trial is for damages of $500,000'"></textarea>
                 </div>
 
-                <button class="btn" onclick="calculateCosts()">
-                    Calculate Costs
+                <button class="btn" onclick="calculateCosts()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); font-size: 18px; padding: 15px 30px;">
+                    💡 Ask Me
                 </button>
 
                 <div class="examples">
-                    <h3>📝 Example Queries:</h3>
+                    <h3>💡 Try These Examples:</h3>
                     <button class="example-btn" onclick="setQuery('Calculate costs for a High Court default judgment with $50,000')">
                         High Court - $50k
                     </button>
-                    <button class="example-btn" onclick="setQuery('District Court summary judgment for $80,000')">
-                        District Court - $80k
+                    <button class="example-btn" onclick="setQuery('I need costs for opposing a stay application, trial is for damages of $500,000')">
+                        Stay Application
                     </button>
-                    <button class="example-btn" onclick="setQuery('Magistrates Court default judgment for $15,000')">
-                        Magistrates - $15k
+                    <button class="example-btn" onclick="setQuery('What are the costs for a 3-day contested trial in District Court?')">
+                        3-Day Trial
                     </button>
-                    <button class="example-btn" onclick="setQuery('High Court contested trial of 3 days with claim of $100,000')">
-                        Trial - $100k
+                    <button class="example-btn" onclick="setQuery('Can I get indemnity costs if the other party acted in bad faith?')">
+                        Indemnity Costs
                     </button>
                 </div>
 
