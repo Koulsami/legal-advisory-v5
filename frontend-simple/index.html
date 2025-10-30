@@ -288,19 +288,24 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>⚖️ MyKraws - Your AI Legal Advisor</h1>
-            <p class="subtitle" style="font-size: 16px; margin-top: 10px; line-height: 1.6;">
-                Hey there! 👋 I'm <strong>MyKraws</strong>, your friendly neighborhood AI legal assistant who <em>actually knows what they're talking about</em>.
-                No hallucinations here – just solid legal advice backed by Singapore's Rules of Court 2021.<br><br>
-                Right now, I'm a <strong>specialist in Order 21 (Legal Costs)</strong>. Think of me as your personal costs calculator with a law degree and a good memory.
-                Go ahead, test my knowledge! Ask me anything about legal costs in Singapore. 💪
-            </p>
-            <div style="margin-top: 15px;">
-                <strong>API URL:</strong>
-                <input type="text" id="apiUrl" value="https://legal-advisory-api-production.up.railway.app" style="width: 300px; display: inline-block;">
-                <span id="statusIndicator" class="status checking">Checking...</span>
-                <button onclick="checkHealth()" style="margin-left: 10px; padding: 5px 10px;">Refresh</button>
+        <div class="header" style="display: flex; align-items: center; gap: 30px;">
+            <div style="flex-shrink: 0;">
+                <img src="MyKraws.jpg" alt="MyKraws AI Legal Advisor" style="width: 250px; height: auto; border-radius: 15px; box-shadow: 0 8px 16px rgba(0,0,0,0.2);">
+            </div>
+            <div style="flex: 1;">
+                <h1>⚖️ MyKraws - Your AI Legal Advisor</h1>
+                <p class="subtitle" style="font-size: 16px; margin-top: 10px; line-height: 1.6;">
+                    Hey there! 👋 I'm <strong>MyKraws</strong>, your friendly neighborhood AI legal assistant who <em>actually knows what they're talking about</em>.
+                    No hallucinations here – just solid legal advice backed by Singapore's Rules of Court 2021.<br><br>
+                    Right now, I'm a <strong>specialist in Order 21 (Legal Costs)</strong>. Think of me as your personal costs calculator with a law degree and a good memory.
+                    Go ahead, test my knowledge! Ask me anything about legal costs in Singapore. 💪
+                </p>
+                <div style="margin-top: 15px;">
+                    <strong>API URL:</strong>
+                    <input type="text" id="apiUrl" value="https://legal-advisory-api-production.up.railway.app" style="width: 300px; display: inline-block;">
+                    <span id="statusIndicator" class="status checking">Checking...</span>
+                    <button onclick="checkHealth()" style="margin-left: 10px; padding: 5px 10px;">Refresh</button>
+                </div>
             </div>
         </div>
 
