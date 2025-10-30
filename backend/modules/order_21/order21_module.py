@@ -5,8 +5,9 @@ Legal Advisory System v5.0
 Implements ILegalModule for Singapore Rules of Court Order 21 (Party-and-Party Costs).
 
 This module provides 100% accurate cost calculations based on:
-- Order 21 Rules (29 rules)
-- Appendix 1 Cost Tables (9 scenarios)
+- Order 21 Rules of Court 2021 (29 rules)
+- Appendix 1 Cost Tables (Rules of Court - general costs for default judgments, etc.)
+- Appendix G Practice Directions (detailed costs for summonses, trials, appeals, and specific applications)
 """
 
 from typing import Any, Dict, List, Tuple
@@ -50,11 +51,11 @@ class Order21Module(ILegalModule):
             version="1.0.0",
             status=ModuleStatus.ACTIVE,
             author="Legal Advisory System v5.0",
-            description="Cost calculation for Singapore civil litigation under Order 21",
+            description="Cost calculation for Singapore civil litigation under Order 21 and Appendix G Practice Directions",
             effective_date="2021-04-01",
-            last_updated="2024-10-26",
+            last_updated="2024-10-30",
             dependencies=[],
-            tags=["costs", "singapore", "civil", "order21", "party-and-party"],
+            tags=["costs", "singapore", "civil", "order21", "party-and-party", "appendix-g", "practice-directions"],
         )
 
     # ============================================
@@ -144,6 +145,24 @@ class Order21Module(ILegalModule):
                 required=False,
                 validation_rules={},
                 enum_values=["plaintiff", "defendant"],
+            ),
+            FieldRequirement(
+                field_name="application_type",
+                field_type="enum",
+                description="Specific type of application or summons (for Appendix G Practice Directions)",
+                required=False,
+                validation_rules={},
+                enum_values=[
+                    "adjournment", "extension_of_time", "amendment_of_pleadings",
+                    "further_and_better_particulars", "production_of_documents",
+                    "security_for_costs", "interim_payments", "striking_out_partial",
+                    "striking_out_whole", "summary_judgment_given", "summary_judgment_dismissed",
+                    "setting_aside_judgment", "stay_for_arbitration", "stay_forum_non_conveniens",
+                    "stay_pending_appeal", "examination_enforcement_respondent",
+                    "discharge_of_solicitor", "setting_aside_service", "permission_to_appeal",
+                    "division_of_issues", "injunction_search_order", "committal_order",
+                    "unless_order"
+                ],
             ),
         ]
 
@@ -311,6 +330,32 @@ class Order21Module(ILegalModule):
     # SPECIALIZED LOGIC (100% Accurate)
     # ============================================
 
+    def _should_use_appendix_g(self, filled_fields: Dict[str, Any]) -> bool:
+        """
+        Determine if Appendix G (Practice Directions) should be used instead of Appendix 1.
+
+        Appendix G applies for:
+        - Specific applications/summonses (application_type present)
+        - Detailed trial categories (trial_category present)
+        - Appeals (appeal_level present)
+        - Originating applications (originating_app_type present)
+
+        Args:
+            filled_fields: User input fields
+
+        Returns:
+            True if Appendix G should be used, False otherwise
+        """
+        # Check for Appendix G indicators
+        appendix_g_indicators = [
+            "application_type",      # Part II: Summonses/Applications
+            "trial_category",        # Part III: Trials (detailed)
+            "originating_app_type",  # Part IV: Originating Applications
+            "appeal_level"           # Part V: Appeals
+        ]
+
+        return any(indicator in filled_fields for indicator in appendix_g_indicators)
+
     def calculate(self, filled_fields: Dict[str, Any]) -> Dict[str, Any]:
         """
         Perform Order 21 cost calculation.
@@ -319,8 +364,8 @@ class Order21Module(ILegalModule):
 
         Calculations based on:
         - Order 21 rules
-        - Appendix 1 cost tables
-        - Court level adjustments
+        - Appendix 1 cost tables (Rules of Court - for default judgments, etc.)
+        - Appendix G Practice Directions (for summonses, trials, appeals, specific applications)
 
         Args:
             filled_fields: All information gathered from user
@@ -344,6 +389,12 @@ class Order21Module(ILegalModule):
             ...     "claim_amount": 50000.0
             ... }
         """
+        # Check if this should use Appendix G (Practice Directions)
+        # Appendix G applies for: specific applications, summonses, detailed trials, appeals
+        if self._should_use_appendix_g(filled_fields):
+            return self.calculate_appendix_g(filled_fields)
+
+        # Otherwise use standard Appendix 1 calculation
         court_level = filled_fields.get("court_level", "High Court")
         case_type = filled_fields.get("case_type", "")
         claim_amount = float(filled_fields.get("claim_amount", 0))
@@ -460,28 +511,28 @@ class Order21Module(ILegalModule):
         # Default judgment - liquidated claim
         if case_type == "default_judgment_liquidated":
             if claim_amount <= 5000:
-                return 1150.0, 800.0, 1500.0, "Appendix 1, Section B, Para 1 (≤$5,000)"
+                return 1150.0, 800.0, 1500.0, "Order 21, Appendix 1, Section B, Para 1 (≤$5,000)"
             elif claim_amount <= 20000:
-                return 2250.0, 1500.0, 3000.0, "Appendix 1, Section B, Para 1 ($5,001-$20,000)"
+                return 2250.0, 1500.0, 3000.0, "Order 21, Appendix 1, Section B, Para 1 ($5,001-$20,000)"
             elif claim_amount <= 60000:
-                return 4000.0, 3000.0, 5000.0, "Appendix 1, Section B, Para 1 ($20,001-$60,000)"
+                return 4000.0, 3000.0, 5000.0, "Order 21, Appendix 1, Section B, Para 1 ($20,001-$60,000)"
             elif claim_amount <= 250000:
-                return 7500.0, 5000.0, 10000.0, "Appendix 1, Section B, Para 1 ($60,001-$250,000)"
+                return 7500.0, 5000.0, 10000.0, "Order 21, Appendix 1, Section B, Para 1 ($60,001-$250,000)"
             else:
-                return 12500.0, 10000.0, 15000.0, "Appendix 1, Section B, Para 1 (>$250,000)"
+                return 12500.0, 10000.0, 15000.0, "Order 21, Appendix 1, Section B, Para 1 (>$250,000)"
 
         # Default judgment - unliquidated claim (with assessment)
         elif case_type == "default_judgment_unliquidated":
             if claim_amount <= 20000:
-                return 3000.0, 2000.0, 4000.0, "Appendix 1, Section B, Para 2 (≤$20,000)"
+                return 3000.0, 2000.0, 4000.0, "Order 21, Appendix 1, Section B, Para 2 (≤$20,000)"
             elif claim_amount <= 60000:
-                return 5500.0, 4000.0, 7000.0, "Appendix 1, Section B, Para 2 ($20,001-$60,000)"
+                return 5500.0, 4000.0, 7000.0, "Order 21, Appendix 1, Section B, Para 2 ($20,001-$60,000)"
             else:
-                return 9500.0, 7000.0, 12000.0, "Appendix 1, Section B, Para 2 (>$60,000)"
+                return 9500.0, 7000.0, 12000.0, "Order 21, Appendix 1, Section B, Para 2 (>$60,000)"
 
         # Summary judgment
         elif case_type == "summary_judgment":
-            return 7500.0, 5000.0, 10000.0, "Appendix 1, Section C - Summary Judgment"
+            return 7500.0, 5000.0, 10000.0, "Order 21, Appendix 1, Section C - Summary Judgment"
 
         # Contested trial
         elif case_type == "contested_trial":
@@ -493,43 +544,43 @@ class Order21Module(ILegalModule):
                 if claim_amount <= 60000:
                     base = 11500.0
                     min_cost, max_cost = 8000.0, 15000.0
-                    basis = "Appendix 1, Section D - Trial 1-2 days (≤$60k)"
+                    basis = "Order 21, Appendix 1, Section D - Trial 1-2 days (≤$60k)"
                 elif claim_amount <= 250000:
                     base = 22500.0
                     min_cost, max_cost = 15000.0, 30000.0
-                    basis = "Appendix 1, Section D - Trial 1-2 days ($60k-$250k)"
+                    basis = "Order 21, Appendix 1, Section D - Trial 1-2 days ($60k-$250k)"
                 else:
                     base = 40000.0
                     min_cost, max_cost = 30000.0, 50000.0
-                    basis = "Appendix 1, Section D - Trial 1-2 days (>$250k)"
+                    basis = "Order 21, Appendix 1, Section D - Trial 1-2 days (>$250k)"
             elif days <= 5:
                 # 3-5 day trial
                 if claim_amount <= 60000:
                     base = 22500.0
                     min_cost, max_cost = 15000.0, 30000.0
-                    basis = "Appendix 1, Section D - Trial 3-5 days (≤$60k)"
+                    basis = "Order 21, Appendix 1, Section D - Trial 3-5 days (≤$60k)"
                 elif claim_amount <= 250000:
                     base = 45000.0
                     min_cost, max_cost = 30000.0, 60000.0
-                    basis = "Appendix 1, Section D - Trial 3-5 days ($60k-$250k)"
+                    basis = "Order 21, Appendix 1, Section D - Trial 3-5 days ($60k-$250k)"
                 else:
                     base = 80000.0
                     min_cost, max_cost = 60000.0, 100000.0
-                    basis = "Appendix 1, Section D - Trial 3-5 days (>$250k)"
+                    basis = "Order 21, Appendix 1, Section D - Trial 3-5 days (>$250k)"
             else:
                 # 6+ day trial
                 if claim_amount <= 60000:
                     base = 40000.0
                     min_cost, max_cost = 30000.0, 50000.0
-                    basis = "Appendix 1, Section D - Trial 6+ days (≤$60k)"
+                    basis = "Order 21, Appendix 1, Section D - Trial 6+ days (≤$60k)"
                 elif claim_amount <= 250000:
                     base = 75000.0
                     min_cost, max_cost = 50000.0, 100000.0
-                    basis = "Appendix 1, Section D - Trial 6+ days ($60k-$250k)"
+                    basis = "Order 21, Appendix 1, Section D - Trial 6+ days ($60k-$250k)"
                 else:
                     base = 150000.0
                     min_cost, max_cost = 100000.0, 200000.0
-                    basis = "Appendix 1, Section D - Trial 6+ days (>$250k)"
+                    basis = "Order 21, Appendix 1, Section D - Trial 6+ days (>$250k)"
 
             # Apply complexity adjustment
             if complexity == "simple":
@@ -544,20 +595,20 @@ class Order21Module(ILegalModule):
         # Interlocutory application
         elif case_type == "interlocutory_application":
             if complexity in ["simple", "moderate"]:
-                return 2250.0, 1500.0, 3000.0, "Appendix 1, Section E - Simple Application"
+                return 2250.0, 1500.0, 3000.0, "Order 21, Appendix 1, Section E - Simple Application"
             else:
-                return 5500.0, 3000.0, 8000.0, "Appendix 1, Section E - Complex Application"
+                return 5500.0, 3000.0, 8000.0, "Order 21, Appendix 1, Section E - Complex Application"
 
         # Appeal
         elif case_type == "appeal":
-            return 45000.0, 30000.0, 60000.0, "Appendix 1, Section F - Appeal"
+            return 45000.0, 30000.0, 60000.0, "Order 21, Appendix 1, Section F - Appeal"
 
         # Striking out
         elif case_type == "striking_out":
-            return 7500.0, 5000.0, 10000.0, "Appendix 1, Section G - Striking Out"
+            return 7500.0, 5000.0, 10000.0, "Order 21, Appendix 1, Section G - Striking Out"
 
         # Default fallback
-        return 5000.0, 3000.0, 7000.0, "General Costs Estimate"
+        return 5000.0, 3000.0, 7000.0, "Order 21 General Costs Estimate"
 
     def get_arguments(
         self, calculation_result: Dict[str, Any], filled_fields: Dict[str, Any]
